@@ -42,10 +42,10 @@ class Generator(AtomicDEVS):
         
         if state == "block":
             print "G state : block -> generate"
-            return GMode("generate")
+            return self.state.set("generate")
         elif state == "generate":
             print "G state : block -> generate"
-            return GMode("block")
+            return self.state.set("block")
         else:
             raise DEVSException(\
                 "unknown state <%s> in Generator internal transition function"\
@@ -133,15 +133,15 @@ class Buffer(AtomicDEVS):
         if state == "pop":
             if len(buffer.get()) == 0:
                 print "Buffer state : pop -> empty"
-                return BMode("empty")
+                return self.state.set("empty")
             else:
                 print "Buffer state : pop -> possible"
-                return BMode("possible")
+                return self.state.set("possible")
             
         elif state == "empty":
-            return BMode("empty")
+            return self.state.set("empty")
         elif state == "possible":
-            return BMode("possible")
+            return self.state.set("possible")
         else:
             raise DEVSException(\
                 "unknown state <%s> in Buffer internal transition function"\
@@ -180,11 +180,11 @@ class Buffer(AtomicDEVS):
                 buffer.append(buffer_in)
                 if state == 'empty':
                     print "Buffer state : empty -> possible"
-                    return BMode("possible")
+                    return self.state.set("possible")
                 else:
-                    return BMode(state)
+                    return self.state.set(state)
             else:
-                return BMode(state)
+                return self.state.set(state)
             
         except:
             print "port[state_in] Event!!"
@@ -198,11 +198,11 @@ class Buffer(AtomicDEVS):
                 state_in = inputs[self.state_in]
                 if state_in == 'ready':
                     print "Buffer state : possible -> pop"
-                    return BMode("pop")
+                    return self.state.set("pop")
                 else:
-                    return BMode(state)
+                    return self.state.set(state)
             else:
-                return BMode(state)
+                return self.state.set(state)
             
         except:
             print "port[buffer_in] Event!!"
@@ -245,9 +245,9 @@ class Processor(AtomicDEVS):
         state = self.state.get()
         if state == "busy":
             print "processor state : busy -> ready"
-            return PMode("ready")
+            return self.state.set("ready")
         else:
-            return PMode("ready")
+            return self.state.set("ready")
         
     def extTransition(self, inputs):
         print "Enter P_extTransition"
@@ -258,11 +258,11 @@ class Processor(AtomicDEVS):
         if proc_in != "None":
             if state == 'ready':
                 print "processor state : ready -> busy"
-                return PMode("busy")
+                return self.state.set("busy")
             else:
-                return PMode(state)
+                return self.state.set(state)
         else:
-            return PMode(state)
+            return self.state.set(state)
 
     def outputFnc(self):
         print "Enter P_outputFnc"

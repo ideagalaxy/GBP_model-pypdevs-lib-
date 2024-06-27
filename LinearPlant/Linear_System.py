@@ -8,11 +8,32 @@ source_inventory = {
 
 data = {
     #proc    working time  
-    'station1':     [60],
-    'station2':     [30],
-    'station3':     [30],
-    'station4':     [18],
-    'station5':     [18],
+    'station_1':     [3],
+    'station_2':     [3],
+    'station_3':     [3],
+    'station_4':     [3],
+    'station_5':     [3],
+    'station_6':     [3],
+    'station_7':     [3],
+    'station_8':     [3],
+    'station_9':     [3],
+    'station_10':    [3],
+    'station_11':    [3],
+    'station_12':    [3],
+    'station_13':    [3],
+    'station_14':    [3],
+    'turn_1':          [10],
+    'turn_2':          [10],
+    'turn_3':          [10],
+    'turn_4':          [10],
+    'turn_5':          [10],
+    'turn_6':          [10],
+    'turn_7':          [10],
+    'turn_8':          [10],
+    'turn_9':          [10],
+    'turn_10':          [10],
+    'turn_11':          [10],
+
 }
 
 class State:
@@ -21,6 +42,7 @@ class State:
 
     def set(self, value):
         self.__state=value
+        return self.__state
 
     def get(self):
         return self.__state
@@ -28,11 +50,69 @@ class State:
     def __str__(self):
         return self.get()
     
-class Source(AtomicDEVS):
-    def __init__(self, name = 'source'):
+class Storage(AtomicDEVS):
+    def __init__(self, name = 'storage'):
         AtomicDEVS.__init__(self, name)
         self.name = name
-        self.state = State("load")
+        self.state = State("pop")
+        outport_name = name + '_outport'
+        self.outport = self.addOutPort(outport_name)
+        response_inport_name = name + '_response_inport'
+        self.response_inport = self.addInPort(response_inport_name)
+
+    def timeAdvance(self):
+        state = self.state.get()
+
+        if state == "load":
+            return INFINITY
+        elif state == "pop":
+            return 0.0
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> time advance transition function"\
+                % (state, self.name))
+        
+    def intTransition(self):
+        state = self.state.get()
+
+        if state == "pop":
+            self.state = State("load")
+            return self.state
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> internal transition function"\
+                % (state, self.name))
+
+    def extTransition(self, inputs):
+        state = self.state.get()
+        response_port_in =inputs[self.response_inport]
+
+        if response_port_in == "pop":
+            if state == "load":
+                self.state = State("pop")
+                return self.state
+            else:
+                return self.state
+        else:
+            return self.state
+            
+    def outputFnc(self):
+        state = self.state.get()
+
+        if state == "pop":
+            return {self.outport: "pop"}
+        else:
+            return {self.outport: "load"}
+    
+class Source(AtomicDEVS):
+    '''
+        state : load / pop / end
+    '''
+    def __init__(self, name = 'source'):
+        AtomicDEVS.__init__(self, name)
+        self.count = 0
+        self.name = name
+        self.state = State("pop")
         outport_name = name + '_outport'
         self.outport = self.addOutPort(outport_name)
 
@@ -41,12 +121,9 @@ class Source(AtomicDEVS):
             self.inventory = source_inventory[name]
 
     def timeAdvance(self):
-        print "timeAdvance",self.name
         state = self.state.get()
-        print self.name, state
-
         if state == "load":
-            return 5.0
+            return 1.0
         elif state == "pop":
             return 0.0
         elif state == "end":
@@ -57,25 +134,25 @@ class Source(AtomicDEVS):
                 % (state, self.name))
         
     def intTransition(self):
-        print "intTransition",self.name
         state = self.state.get()
-        print self.name, state
 
         if state == "load":
             if self.inventory == INFINITY:
-                print "Inventory = Inf"
-                return self.state.set("pop")
+                self.state = State("pop")
+                return self.state
+            
             else:
                 if self.inventory > 0:
                     self.inventory = self.inventory - 1
-                    return self.state.set("pop")
+                    self.state = State("pop")
+                    return self.state
                 else:
-                    return self.state.set("end")
+                    self.state = State("end")
+                    return self.state
                 
         elif state == "pop":
-            return self.state.set("load")
-        
-        elif state == "end":
+            self.count += 1
+            self.state = State("load")
             return self.state
         
         else:
@@ -84,9 +161,7 @@ class Source(AtomicDEVS):
                 % (state, self.name))
     
     def outputFnc(self):
-        print "output",self.name
         state = self.state.get()
-        print self.name, state
 
         if state == "pop":
             return {self.outport: "pop"}
@@ -103,13 +178,13 @@ class Buffer(AtomicDEVS):
         self.outport = self.addOutPort(outport_name)
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
+        response_inport_name = name + '_response_inport'
+        self.response_inport = self.addInPort(response_inport_name)
 
-        self.do_pop = False
+        self.do_pop = True
 
     def timeAdvance(self):
-        print "time advance",self.name
         state = self.state.get()
-        print self.name, state
 
         if state == "empty":
             return INFINITY
@@ -123,55 +198,65 @@ class Buffer(AtomicDEVS):
                 % (state, self.name))
         
     def intTransition(self):
-        print "int Transition",self.name
         state = self.state.get()
-        print self.name, state
 
         if state == "pop":
             if self.inventory == 0:
-                return self.state.set("empty")
+                self.state = State("empty")
+                return self.state
             else:
-                return self.state.set("ready")
+                self.state = State("ready")
+                return self.state
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> internal transition function"\
                 % (state, self.name))
 
     def extTransition(self, inputs):
-        port_in =inputs[self.inport]
-        print "ext transition", self.name , port_in
         state = self.state.get()
-        print self.name, state
-
-        if port_in == "pop":
-            self.inventory = self.inventory + 1
-            if self.do_pop == False:
-                return self.state.set("ready")
-            else:
-                self.do_pop == False
-                return self.state.set("pop")
+        try:    
+            port_in =inputs[self.inport]
+        except:
+            port_in = None
+        try:
+            response_port_in =inputs[self.response_inport]
+        except:
+            response_port_in = None
         
-        elif port_in == "ready":
-            self.do_pop = True
-            if state == "empty":
-                return self.state
+        # inport
+        if port_in != None:
+
+            if port_in == "pop":
+                self.inventory = self.inventory + 1
+                if self.do_pop == False:
+                    self.state = State("ready")
+                    return self.state
+                else:
+                    self.do_pop = False
+                    self.inventory = self.inventory - 1
+                    self.state = State("pop")
+                    return self.state
             else:
-                self.do_pop = False
-                self.inventory = self.inventory - 1
-                return self.state.set("pop")
-        else:
-            return self.state
+                return self.state
+            
+        if response_port_in != None:
+            
+            if response_port_in == "pop":
+                self.do_pop = True
+                if state == "empty":
+                    return self.state
+                else:
+                    self.do_pop = False
+                    self.inventory = self.inventory - 1
+                    self.state = State("pop")
+                    return self.state
+            else:
+                return self.state
             
     def outputFnc(self):
-        print "output", self.name
         state = self.state.get()
-        print "output", state
 
-        if state == "ready":
-            return {self.outport: "ready"}
-        elif state == "empty":
-            return {self.outport: "empty"}
-        elif state == "pop":
+        if state == "pop":
             return {self.outport: "pop"}
         
 class Station(AtomicDEVS):
@@ -183,23 +268,29 @@ class Station(AtomicDEVS):
         self.outport = self.addOutPort(outport_name)
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
+        response_inport_name = name + '_response_inport'
+        self.response_inport = self.addInPort(response_inport_name)
 
-        self.do_pop = False
+        self.check_finish_time = 0.0
+        self.check_ext = False
+        self.do_pop = True
         self.working_time = 11
         #init section
         if name in data:
             init = data[name]
             self.working_time = init[0]
+            self.working_time_backup = self.working_time
 
 
     def timeAdvance(self):
-        print "time advance",self.name
         state = self.state.get()
-        print "time advance",self.state
 
         if state == "ready":
             return INFINITY
         elif state == "working":
+            self.working_time = self.working_time_backup
+            if self.check_ext == True:
+                self.working_time = self.check_finish_time
             return self.working_time
         elif state == "pop":
             return 0.0
@@ -211,64 +302,77 @@ class Station(AtomicDEVS):
                 % (state, self.name))
     
     def intTransition(self):
-        print "int Transition",self.name
         state = self.state.get()
-        print "int Transition",state
 
         if state == "working":
+            self.working_time
             if self.do_pop == False:
-                return self.state.set("waiting")
+                self.state = State("waiting")
+                return self.state
             else:
                 self.do_pop = False
-                return self.state.set("pop")
+                self.state = State("pop")
+                return self.state
             
         elif state == "pop":
-            return self.state.set("ready")
+            self.state = State("ready")
+            return self.state
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> internal transition function"\
                 % (state, self.name))
         
     def extTransition(self, inputs):
-        port_in =inputs[self.inport]
-        print "extTransition",self.name, port_in
         state = self.state.get()
-        print "extTransition",state
+        self.check_ext = False
+        if state == "working":
+            self.check_ext = True
+            self.check_finish_time = self.time_next[0] - (self.time_last[0] + 1)
 
-        if port_in == "pop":
-            if state == "ready":
-                return self.state.set("working")
+        try:    
+            port_in =inputs[self.inport]
+        except:
+            port_in = None
+        try:
+            response_port_in =inputs[self.response_inport]
+        except:
+            response_port_in = None
+
+        if port_in != None:
+            if port_in == "pop":
+                if state == "ready":
+                    self.state = State("working")
+                    return self.state
+            else:
+                return self.state
             
-        if port_in == "ready" or port_in == "empty":
-            self.do_pop = True
-            if state == "waiting":
-                self.do_pop = False
-                return self.state.set("pop")
-            elif state == "ready":
-                self.do_pop = False
-                return self.state.set("ready")
-            elif state == "working":
-                return self.state.set(state)
-        else:
-            return self.state
+        if response_port_in != None:
+            if response_port_in == "pop" or response_port_in[0] == "T":
+                self.do_pop = True
+                if state == "waiting":
+                    self.do_pop = False
+                    self.state = State("pop")
+                    return self.state
+                elif state == "ready":
+                    return self.state
+                elif state == "working":
+                    return self.state
+            else:
+                return self.state
+
         
     def outputFnc(self):
-        print "output",self.name
         state = self.state.get()
-        print "output",state
 
-        if state == "ready":
-            return {self.outport: "ready"}
-        elif state == "working":
-            return {self.outport: "working"}
-        elif state == "waiting":
+        if state == "working":
             return {self.outport: "waiting"}
-        elif state == "pop":
+        if state == "pop":
             return {self.outport: "pop"}
 
 class Drain(AtomicDEVS):
     def __init__(self, name = 'drain'):
         AtomicDEVS.__init__(self, name)
+        self.elapsed = 0.0
         self.name = name
         self.state = State("ready")
         outport_name = name + '_outport'
@@ -276,9 +380,10 @@ class Drain(AtomicDEVS):
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
 
+        self.count = 0
+
     def timeAdvance(self):
         state = self.state.get()
-        print "time advance",self.name
 
         if state == "ready":
             return INFINITY
@@ -295,15 +400,17 @@ class Drain(AtomicDEVS):
 
         if port_in == "pop":
             self.count = self.count + 1
-            return self.state.set("get")
+            self.state = State("get")
+            return self.state
+        else:
+            return self.state
         
     def intTransition(self):
         state = self.state.get()
 
-        print "int Transition",self.name
-
         if state == "get":
-            return self.state.set("ready")
+            self.state = State("ready")
+            return self.state
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> internal transition function"\
@@ -313,13 +420,11 @@ class Drain(AtomicDEVS):
         state = self.state.get()
 
         if state == "get":
-            text = "Total : "
-            return {self.outport: self.count}
-        else:
-            return {self.outport: state}
+            text = "Total : %s" % (self.count)
+            return {self.outport: text}
 
         
-        
+'''
 class Storage(CoupledDEVS):
     def __init__(self, name="main_storage"):
         CoupledDEVS.__init__(self, name)
@@ -327,95 +432,18 @@ class Storage(CoupledDEVS):
         self.main_buffer = self.addSubModel(Buffer(name="main_buffer"))
 
         self.outport = self.addOutPort(name="Storage_outport")
-        self.inport = self.addInPort(name="Storage_buffer_inport")
+        self.response_inport = self.addInPort(name="Storage_buffer_inport")
 
+        #inside connect
         self.connectPorts(self.main_source.outport, self.main_buffer.inport)
 
+        #outside connect
         self.connectPorts(self.main_buffer.outport, self.outport)
-        self.connectPorts(self.inport, self.main_buffer.inport)
+        self.connectPorts(self.response_inport, self.main_buffer.response_inport)
 
     def select(self, imm):
-        if self.main_source in imm:
+        if self.main_buffer in imm:
+            return self.main_buffer
+        else:
             return self.main_source
-        
-class Stem(CoupledDEVS):
-    def __init__(self, name="main_stem"):
-        CoupledDEVS.__init__(self, name)
-        self.station_1 = self.addSubModel(Station(name="station_1"))
-        self.station_2 = self.addSubModel(Station(name="station_2"))
-        self.station_3 = self.addSubModel(Station(name="station_3"))
-        self.buffer_1 = self.addSubModel(Buffer(name="buffer_1"))
-        self.station_4 = self.addSubModel(Station(name="station_4"))
-        self.station_5 = self.addSubModel(Station(name="station_5"))
-
-        self.outport = self.addOutPort(name= "main_stem_outport")
-        self.inport = self.addInPort(name= "main_stem_inport")
-
-        self.first_outport = self.addOutPort(name= "first_outport")
-        self.last_inport = self.addInPort(name= "last_inport")
-        
-
-        self.connectPorts(self.inport, self.station_1.inport)
-
-        self.connectPorts(self.station_1.outport, self.station_2.inport)
-        self.connectPorts(self.station_1.outport, self.first_outport)
-
-        self.connectPorts(self.station_2.outport, self.station_1.inport)
-        self.connectPorts(self.station_2.outport, self.station_3.inport)
-
-        self.connectPorts(self.station_3.outport, self.station_2.inport)
-        self.connectPorts(self.station_3.outport, self.buffer_1.inport)
-
-        self.connectPorts(self.buffer_1.outport, self.station_4.inport)
-
-        self.connectPorts(self.station_4.outport, self.buffer_1.inport)
-        self.connectPorts(self.station_4.outport, self.station_5.inport)
-
-        self.connectPorts(self.last_inport, self.station_5.inport)
-        self.connectPorts(self.station_5.outport, self.station_4.inport)
-        
-        self.connectPorts(self.station_5.outport, self.outport)
-        print "connect all"
-
-    def select(self, imm):
-        if self.station_5 in imm:
-            return self.station_5
-        elif self.station_4 in imm:
-            return self.station_4
-        elif self.buffer_1 in imm:
-            return self.buffer_1
-        elif self.buffer_1 in imm:
-            return self.buffer_1
-        elif self.station_3 in imm:
-            return self.station_3
-        elif self.station_2 in imm:
-            return self.station_2
-        elif self.station_1 in imm:
-            return self.station_1
-
-class LinearLine(CoupledDEVS):
-    def __init__(self, name="LinearLine"):
-        CoupledDEVS.__init__(self, name)
-        self.main_storage = self.addSubModel(Storage(name="main_storage"))
-        self.main_stem = self.addSubModel(Stem(name="main_stem"))
-        self.result = self.addSubModel(Drain(name="result"))
-
-        self.connectPorts(self.main_storage.outport, self.main_stem.inport)
-        self.connectPorts(self.main_stem.first_outport, self.main_storage.inport)
-
-        self.connectPorts(self.main_stem.outport, self.result.inport)
-        self.connectPorts(self.result.outport, self.main_stem.last_inport)
-
-    def select(self, imm):
-        if self.main_storage in imm:
-            return self.main_storage
-
-
-from pypdevs.simulator import Simulator 
-sim = Simulator(LinearLine("LinearLine"))
-
-sim.setVerbose()
-sim.setTerminationTime(600)
-sim.setClassicDEVS()
-
-sim.simulate()
+'''
