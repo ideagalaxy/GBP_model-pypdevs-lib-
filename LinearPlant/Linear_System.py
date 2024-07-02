@@ -4,6 +4,8 @@ from pypdevs.simulator import Simulator
 import pypdevs.accurate_time as time
 import random
 
+
+
 source_inventory = {
     'main_source' : INFINITY
 }
@@ -399,6 +401,14 @@ class Station(AtomicDEVS):
             return {self.outport: "waiting"}
         if state == "pop":
             return {self.outport: "pop"}
+        
+RESULT = 0
+
+result_dict = {
+    "result1" : 0,
+    "result2" : 0,
+    "result3" : 0
+}
 
 class Drain(AtomicDEVS):
     def __init__(self, name = 'drain'):
@@ -452,6 +462,7 @@ class Drain(AtomicDEVS):
 
         if state == "get":
             text = "Total : %s" % (self.count)
+            result_dict[self.name] = self.count
             return {self.outport: text}
 
         
