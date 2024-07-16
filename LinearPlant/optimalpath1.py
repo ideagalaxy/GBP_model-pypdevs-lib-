@@ -106,16 +106,11 @@ class OptimalPath1(CoupledDEVS):
 #setting
 sim = Simulator(OptimalPath1("OptimalPath1"))
 
-#sim.setVerbose()
-sim.setTerminationTime(15552000)
+sim.setVerbose()
+sim.setTerminationTime(60)
 sim.setClassicDEVS()
 
 sim.simulate()
 
 
 from Linear_System import result_dict
-
-
-
-print "*** Finsish Simulator ***\n \
-        Result = ", result_dict['result1']
