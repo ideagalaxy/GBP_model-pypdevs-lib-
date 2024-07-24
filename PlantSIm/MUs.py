@@ -100,6 +100,9 @@ class Queue:
     def get(self):
         return self.__queue
     
+    def len(self):
+        return len(self.__queue)
+    
     def is_empty(self):
         if len(self.__queue) == 0:
             return True
@@ -107,6 +110,28 @@ class Queue:
         else:
             return False
 
+class Stack:
+    def __init__(self):
+        self.__stack = []
+
+    def append(self,value):
+        self.__stack.append(value)
+        return self.__stack
     
+    def pop(self):
+        self.__pop = self.__stack.pop()
+        return self.__pop
+    
+    def get(self):
+        return self.__stack
+    
+    def len(self):
+        return len(self.__stack)
+    
+    def is_empty(self):
+        if len(self.__stack) == 0:
+            return True
+        else:
+            return False
 
     
