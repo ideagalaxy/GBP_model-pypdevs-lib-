@@ -3,13 +3,13 @@ from pypdevs.infinity import INFINITY
 import random
 from pypdevs.simulator import Simulator
 
-from MUs import State_arr, State_str
+from MUs import State_arr, State_str, Part, Queue
     
 class Source(AtomicDEVS):
     '''
         state : load / pop / end
     '''
-    def __init__(self, name = 'source', amount = -1, interval = 1):
+    def __init__(self, name = 'source', amount = -1, interval = 1, part_lwh = [1,1,1]):
         AtomicDEVS.__init__(self, name)
         self.name = name
         self.state = State_str("pop")
@@ -20,6 +20,7 @@ class Source(AtomicDEVS):
         #setting
         self.amount = amount
         self.interval = interval
+        self.part_lwh = part_lwh
 
     def timeAdvance(self):
         state = self.state.get()
@@ -53,9 +54,11 @@ class Source(AtomicDEVS):
     
     def outputFnc(self):
         state = self.state.get()
-        print(self.count)
+        
         if state == "pop":
-            return {self.outport: "pop"}    # 여기 나중에 part 출력하면 될듯
+            self.count += 1
+            name = "part_" + str(self.count)
+            return {self.outport: [state,Part(name, self.part_lwh[0], self.part_lwh[1], self.part_lwh[2])]}
         
 class Buffer(AtomicDEVS):
     def __init__(self, name = 'buffer'):
@@ -68,18 +71,18 @@ class Buffer(AtomicDEVS):
         response_inport_name = name + '_response_inport'
         self.response_inport = self.addInPort(response_inport_name)
 
-        self.inventory = []
+        self.inventory = Queue()
         self.do_pop = True
-        self.state = BState(["empty",len(self.inventory)])
+        self.state = State_str("empty")
 
     def timeAdvance(self):
         state = self.state.get()
 
-        if state[0] == "empty":
+        if state == "empty":
             return INFINITY
-        elif state[0] == "ready":
+        elif state == "ready":
             return INFINITY
-        elif state[0] == "pop":
+        elif state == "pop":
             return 0.0
         else:
             raise DEVSException(\
@@ -89,12 +92,12 @@ class Buffer(AtomicDEVS):
     def intTransition(self):
         state = self.state.get()
 
-        if state[0] == "pop":
-            if len(self.inventory) == 0:
-                self.state = BState(["empty",len(self.inventory)])
+        if state == "pop":
+            if self.inventory.is_empty():
+                self.state = State_str("empty")
                 return self.state
             else:
-                self.state = BState(["ready",len(self.inventory)])
+                self.state = State_str("ready")
                 return self.state
         else:
             raise DEVSException(\
@@ -115,42 +118,43 @@ class Buffer(AtomicDEVS):
         # inport
         if port_in != None:
 
-            if port_in == "pop":
+            if port_in[0] == "pop":
                 #1. save into inventory
-                self.inventory.append(port_in)
+                self.inventory.append(port_in[1])
+
                 
                 #2-1 if do_pop is True
                 if self.do_pop == True:
                     #pop inventory's first entry
-                    self.inventory.pop(0)
+                    self.__pop = self.inventory.pop()
 
                     #Set state "pop"
-                    self.state = BState(["pop",len(self.inventory)])
+                    self.state = State_str("pop")
                     self.do_pop = False
                     return self.state
                 
                 #2-2 if do_pop is False
                 else:
                     #Set state "ready"
-                    self.state = BState(["ready",len(self.inventory)])
+                    self.state = State_str("ready")
                     return self.state
             
         if response_port_in != None:
-            
-            if response_port_in == "pop":
+            if response_port_in[0] == "pop":
+                
                 #Save this response
                 self.do_pop = True
 
                 #If Buffer Can't pop entry
-                if state[0] == "empty":
-                    self.state = BState(["empty",len(self.inventory)])
+                if state == "empty":
+                    self.state = State_str("empty")
                     return self.state
                 
                 #Buffer can pop entry
                 else:
-                    self.inventory.pop(0)
+                    self.__pop = self.inventory.pop()
                     #Set state "pop"
-                    self.state = BState(["pop",len(self.inventory)])
+                    self.state = State_str("pop")
                     #Release do_pop
                     self.do_pop = False
                     return self.state
@@ -162,28 +166,28 @@ class Buffer(AtomicDEVS):
     def outputFnc(self):
         state = self.state.get()
 
-        if state[0] == "pop":
-            return {self.outport: "pop"}
+        if state == "pop":
+            return {self.outport: [state,self.__pop]}
         
 class Processor(AtomicDEVS):
-    def __init__(self, name = 'processor'):
+    def __init__(self, name = 'processor', working_time = 10):
         AtomicDEVS.__init__(self, name)
         self.name = name
-        self.state = State("ready")
+        self.state = State_str("ready")
         outport_name = name + '_outport'
         self.outport = self.addOutPort(outport_name)
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
 
-        #init section
-        if name in data:
-            init = data[name]
-            self.working_time = init[0]
+        #setting
+        self.working_time = working_time
 
     def timeAdvance(self):
         state = self.state.get()
 
         if state == "ready":
+            return INFINITY
+        elif state == "block":
             return INFINITY
         elif state == "busy":
             return self.working_time
@@ -196,7 +200,7 @@ class Processor(AtomicDEVS):
         state = self.state.get()
 
         if state == "busy":
-            self.state = State("ready")
+            self.state = State_str("ready")
             return self.state
         else:
             raise DEVSException(\
@@ -205,9 +209,11 @@ class Processor(AtomicDEVS):
         
     def extTransition(self, inputs):
         state = self.state.get()
+        port_in =inputs[self.inport]
 
         if state == "ready":
-            self.state = State("busy")
+            self.__product = port_in[1]
+            self.state = State_str("busy")
             return self.state
            
         else:
@@ -219,16 +225,17 @@ class Processor(AtomicDEVS):
         state = self.state.get()
 
         if state == "busy":
-            return {self.outport: "pop" }
+            return {self.outport: ["pop",self.__product] }
 
 class Drain(AtomicDEVS):
     def __init__(self, name = 'drain'):
         AtomicDEVS.__init__(self, name)
         self.name = name
-        self.state = GState(["get", 0])
+        self.state = State_arr(["get", 0])
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
         self.count = 0
+        self.result = []
 
     def timeAdvance(self):
         state = self.state.get()
@@ -243,9 +250,12 @@ class Drain(AtomicDEVS):
     def extTransition(self, inputs):
         state = self.state.get()
 
+        port_in =inputs[self.inport]
+
         if state[0] == "get":
             self.count += 1
-            self.state = GState(["get", self.count])
+            self.result.append(port_in[1])
+            self.state = State_arr(["get", self.count])
             return self.state
         else:
             raise DEVSException(\
@@ -253,7 +263,7 @@ class Drain(AtomicDEVS):
                 % (state, self.name))
         
 class Station(CoupledDEVS):
-    def __init__(self, name="station"):
+    def __init__(self, name="station",processor_working_time = 10):
         CoupledDEVS.__init__(self, name)
         self.name = name
 
@@ -261,7 +271,9 @@ class Station(CoupledDEVS):
         processor_name = "processor_" + num
         buffer_name = "buffer_" + num
         self.buffer = self.addSubModel(Buffer(name=buffer_name))  
-        self.station = self.addSubModel(Processor(name=processor_name))  
+
+        self.working_time = processor_working_time
+        self.station = self.addSubModel(Processor(name=processor_name,working_time=self.working_time))  
 
         inport_name = self.name + "_inport"
         outport_name = self.name + "_outport"
@@ -280,42 +292,50 @@ class Station(CoupledDEVS):
             return self.station
         elif self.buffer in imm:
             return self.buffer
-        
 
-        
+
+inputData = {
+    "name"  :["source","station_1", "station_2","station_3","result"],
+    "type"  :["Source", "Station", "Station", "Station", "Drain"],
+    "time"  :[5,12,10,15,None],
+}
+
 class LinearLine(CoupledDEVS):
-    def __init__(self, name="LinearLine"):
+    def __init__(self, name="LinearLine", inputData= {}):
         CoupledDEVS.__init__(self, name)
-        self.storage = self.addSubModel(Source(name="Source"))        #outport, response_inport
+        self.variable = []
+        for i in range(len(inputData["name"])):
+            name = inputData["name"][i]
+            if inputData["type"][i] == "Source":
+                setattr(self,name,self.addSubModel(Source(name=name))
+            elif inputData["type"][i] == "Station":
+                setattr(self,name,self.addSubModel(Station(name=name))
+            else:
+                setattr(self,name,self.addSubModel(Drain(name=name))
+            self.variable.append(name)
 
-        self.station_1 = self.addSubModel(Processor(name="BS_1"))    #outport, inport, response_inport
-        self.station_2 = self.addSubModel(Processor(name="BS_2"))
-        self.station_3 = self.addSubModel(Processor(name="BS_3"))
+        for i in range(len(self.variable)-1):
+            val_outport = getattr(self, self.variable[i])
+            val_inport = getattr(self, self.variable[i+1])
+            val_outport = val_outport.ouport
+            val_inport = val_inport.inport
 
-        self.result = self.addSubModel(Drain(name="result"))            #inport,outport
-        
-        #connect outports >> inports
-        self.connectPorts(self.storage.outport, self.station_1.inport)
-        self.connectPorts(self.station_1.outport, self.station_2.inport)
-        self.connectPorts(self.station_2.outport, self.station_3.inport)
-        self.connectPorts(self.station_3.outport, self.result.inport)
+            self.connectPorts(val_outport,val_inport)
 
     def select(self, imm):
-        if self.result in imm:
-            return self.result
-        elif self.station_3 in imm:
-            return self.station_3
-        elif self.station_2 in imm:
-            return self.station_2
-        elif self.station_1 in imm:
-            return self.station_1
-        elif self.storage in imm:
-            return self.storage
+        for var_name in reversed(self.variable):
+            var_value = getattr(self, var_name)
+            if var_value in imm:
+                return var_value
+        
+
+
+
 
 sim = Simulator(LinearLine("LinearLine"))
 
 sim.setVerbose()
-sim.setTerminationTime(21600)
+sim.setTerminationTime(120)
 sim.setClassicDEVS()
 
 sim.simulate()
