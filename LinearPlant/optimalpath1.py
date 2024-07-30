@@ -2,9 +2,68 @@
 from pypdevs.simulator import Simulator
 from Linear_System import Storage, Station, Drain
 from pypdevs.DEVS import *
-        
+
+
+
+inputData = {
+    "name"  :["storage","station_1" ,"station_2" ,"station_3" ,"station_4" ,"station_5" ,"station_6" ,"station_7" ,
+              "station_8" ,"station_9" ,"station_10" ,"station_11" ,"turn_1",    "station_12" ,"station_13" ,"station_14" ,"result"],
+    "type"  :["Storage","Station"   ,"Station"   ,"Station"   ,"Station"   ,"Station"   ,"Station"   ,"Station"   ,
+              "Station"   ,"Station"   ,"Station"    ,"Station"    ,"Station"    ,"Station"   ,"Station"    ,"Station"    ,"Drain"]
+}
+
+class Auto_op1(CoupledDEVS):
+    def __init__(self, name="auto_op1", inputData= {}):
+        CoupledDEVS.__init__(self, name)
+        self.variable_name = []
+        self.variable_type = []
+        for i in range(len(inputData["name"])):
+            name = inputData["name"][i]
+            type = inputData["type"][i]
+            if type == "Storage":
+                setattr(self,name,self.addSubModel(Storage(name=name)))
+
+            
+            elif type == "Station":
+                 setattr(self,name,self.addSubModel(Station(name=name)))
+
+            elif type == "Drain":
+                setattr(self,name,self.addSubModel(Drain(name=name)))
+            else:
+                print("***     type error      ***")
+
+            self.variable_name.append(name)
+            self.variable_type.append(type)
+
+        print(self.variable_name)
+        print(self.variable_type)
+
+        for i in range(len(self.variable_name)-1):
+            val_now = getattr(self, self.variable_name[i])
+            val_next = getattr(self, self.variable_name[i+1])
+            now_outport = val_now.outport
+            next_inport = val_next.inport
+
+            self.connectPorts(now_outport,next_inport)
+
+            now_response = val_now.response_inport
+            next_outport = val_next.outport
+
+            self.connectPorts(next_outport,now_response)
+
+            
+
+
+    def select(self, imm):
+        for var_name in reversed(self.variable_name):
+            var_value = getattr(self, var_name)
+            if var_value in imm:
+                return var_value
+
+
+
 class OptimalPath1(CoupledDEVS):
-    def __init__(self, name="OptimalPath1"):
+    def __init__(self, name="Auto_op1"):
         CoupledDEVS.__init__(self, name)
         self.storage = self.addSubModel(Storage(name="storage"))        #outport, response_inport
 
@@ -104,10 +163,12 @@ class OptimalPath1(CoupledDEVS):
 
 
 #setting
+#sim = Simulator(Auto_op1("Auto_op1",inputData=inputData))
 sim = Simulator(OptimalPath1("OptimalPath1"))
 
-sim.setVerbose()
-sim.setTerminationTime(60)
+
+#sim.setVerbose()
+sim.setTerminationTime(21600)
 sim.setClassicDEVS()
 
 sim.simulate()

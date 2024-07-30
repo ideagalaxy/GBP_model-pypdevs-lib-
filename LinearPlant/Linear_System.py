@@ -462,6 +462,7 @@ class Drain(AtomicDEVS):
 
         if state == "get":
             text = "Total : %s" % (self.count)
+            print(text)
             result_dict[self.name] = self.count
             return {self.outport: text}
 
