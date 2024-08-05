@@ -133,5 +133,18 @@ class Stack:
             return True
         else:
             return False
+        
+class Out:
+    def __init__(self):
+        self._dict = {}
+    
+    def get(self,key):
+        return self._dict.get(key, default=None)
+    
+    def set(self,key,value):
+        self._dict[key] = value
+    
+    def __call__(self):
+        return self._dict
 
     

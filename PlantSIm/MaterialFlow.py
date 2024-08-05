@@ -1,14 +1,26 @@
+#
+#
+#       Basically, all materials are significantly affected only by the pop or block state
+#       You must return the 'State' object(or self.state) in every step
+#       Output
+#        
+#       
+#
+
+
 from pypdevs.DEVS import *
 from pypdevs.infinity import INFINITY
 import random
 from pypdevs.simulator import Simulator
 
 from MUs import *
+
+
+def print_all(inpo):
+    print(inpo)
     
-class Source(AtomicDEVS):
-    '''
-        state : load / pop / end
-    '''
+class Source(AtomicDEVS):               #Source will create 'Part' object
+
     def __init__(self, name = 'source', amount = -1, interval = 1, part_lwh = [1,1,1]):
         AtomicDEVS.__init__(self, name)
         self.name = name
@@ -18,9 +30,9 @@ class Source(AtomicDEVS):
         self.count = 0
 
         #setting
-        self.amount = amount
-        self.interval = interval
-        self.part_lwh = part_lwh
+        self.amount = amount            #Set how many to create
+        self.interval = interval        #Generate term
+        self.part_lwh = part_lwh        #Information of the Part object to be created (length, width, height)
 
     def timeAdvance(self):
         state = self.state.get()
@@ -38,7 +50,7 @@ class Source(AtomicDEVS):
 
         if state == "pop":
             if self.amount == -1:
-                self.state = State_str("pop")
+                self.state = State_str("pop")           #Resetting the new "pop" state will reset the TimeAdvance 
             else:
                 self.count += 1 
                 if self.count >= self.amount:
@@ -56,23 +68,32 @@ class Source(AtomicDEVS):
         state = self.state.get()
         
         if state == "pop":
+            out = Out()
+            out.set("state","pop")
+
             self.count += 1
             name = "part_" + str(self.count)
-            return {self.outport: [state,Part(name, self.part_lwh[0], self.part_lwh[1], self.part_lwh[2])]}
+            out.set("part",Part(name, self.part_lwh[0], self.part_lwh[1], self.part_lwh[2]))
+            
+            return {self.outport: out}
         
 class Buffer(AtomicDEVS): 
     def __init__(self, name = 'buffer', capacity = INFINITY, buffer_type = "Queue"):
         AtomicDEVS.__init__(self, name)
         self.name = name
+        self.state = State_str("empty")
+
         outport_name = name + '_outport'
-        self.outport = self.addOutPort(outport_name)
         inport_name = name + '_inport'
-        self.inport = self.addInPort(inport_name)
         response_inport_name = name + '_response_inport'
+
+        self.outport = self.addOutPort(outport_name)
+        self.inport = self.addInPort(inport_name)
         self.response_inport = self.addInPort(response_inport_name)
         
+        self.time_last
+
         self.do_pop = True
-        self.state = State_str("empty")
         self.is_full = False
         self.init_msg = "msg : "
 
@@ -196,61 +217,143 @@ class Buffer(AtomicDEVS):
                 return {self.outport: ["block", msg]}
 
         
-class Processor(AtomicDEVS):
-    def __init__(self, name = 'processor', working_time = 10):
+
+
+
+class Conveyor(AtomicDEVS): 
+    def __init__(self, name = 'conveyor', length = 8, speed = "Queue"):
         AtomicDEVS.__init__(self, name)
         self.name = name
         self.state = State_str("ready")
+
         outport_name = name + '_outport'
-        self.outport = self.addOutPort(outport_name)
         inport_name = name + '_inport'
+        response_inport_name = name + '_response_inport'
+
         self.inport = self.addInPort(inport_name)
+        self.outport = self.addOutPort(outport_name)
+        self.response_inport = self.addInPort(response_inport_name)
+        
+        self.do_pop = True
+        self.is_full = False
+        self.init_msg = "msg : "
 
         #setting
-        self.working_time = working_time
+        self.length = length
+        self.speed = speed
 
     def timeAdvance(self):
         state = self.state.get()
 
-        if state == "ready":
+        if state == "block":
             return INFINITY
-        elif state == "busy":
-            return self.working_time
+        elif state == "ready":
+            return INFINITY
+        elif state == "pop":
+            return 0.0
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> time advance transition function"\
                 % (state, self.name))
-    
+        
     def intTransition(self):
         state = self.state.get()
 
-        if state == "busy":
-            self.state = State_str("ready")
-            return self.state
+        if state == "pop":
+            if self.inventory.is_empty():
+                self.state = State_str("empty")
+                return self.state
+            else:
+                if self.is_full == False:
+                    self.state = State_str("ready")
+                else:
+                    self.state = State_str("block")
+                return self.state
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> internal transition function"\
                 % (state, self.name))
-        
+
     def extTransition(self, inputs):
         state = self.state.get()
-        port_in =inputs[self.inport]
+        try:    
+            port_in =inputs[self.inport]
+        except:
+            port_in = None
+        try:
+            response_port_in =inputs[self.response_inport]
+        except:
+            response_port_in = None
+        
+        # inport
+        if port_in != None:
+            if port_in[0] == "pop":
+                #1. save into inventory
+                self.inventory.append(port_in[1])
 
-        if state == "ready":
-            self.__product = port_in[1]
-            self.state = State_str("busy")
-            return self.state
-           
-        else:
-            raise DEVSException(\
-                "unknown state <%s> in <%s> external transition function"\
-                % (state, self.name))
+                
+                #2-1 if do_pop is True
+                if self.do_pop == True:
+                    #pop inventory's first entry
+                    self.__pop = self.inventory.pop()
 
+                    #Set state "pop"
+                    self.state = State_str("pop")
+                    self.do_pop = False
+                    return self.state
+                
+                #2-2 if do_pop is False
+                else:
+                    #Set state "ready" or "block"
+                    if self.capacity <= self.inventory.len():
+                        if self.capacity != -1:
+                            self.is_full = True
+                            self.state = State_str("pop")
+                            return self.state
+                        else:
+                            self.state = State_str("ready")
+                            return self.state
+                    else:
+                        self.state = State_str("ready")
+                        return self.state
+            
+        if response_port_in != None:
+            if response_port_in[0] == "pop":
+                
+                #Save this response
+                self.do_pop = True
+                self.is_full = False
+
+                #If Buffer Can't pop entry
+                if state == "empty":
+                    self.state = State_str("empty")
+                    return self.state
+                
+                #Buffer can pop entry
+                else:
+                    self.__pop = self.inventory.pop()
+                    #Set state "pop"
+                    self.state = State_str("pop")
+                    #Release do_pop
+                    self.do_pop = False
+                    return self.state
+            
+        return self.state
+            
     def outputFnc(self):
         state = self.state.get()
+        msg = self.init_msg + "inventory length : " + str(self.inventory.len())
+        if state == "pop":
+            if self.is_full == False:
+                return {self.outport: ["pop",self.__pop, msg]}
+            else:
+                msg = msg + ", State : block, inventory was full"
+                return {self.outport: ["block", msg]}
 
-        if state == "busy":
-            return {self.outport: ["pop",self.__product] }
+
+
+
+
         
 class Station(AtomicDEVS):
     def __init__(self, name = 'station', working_time = 10):
@@ -259,14 +362,14 @@ class Station(AtomicDEVS):
         self.state = State_str("ready")
 
         outport_name = name + '_outport'
-        self.outport = self.addOutPort(outport_name)
-
         inport_name = name + '_inport'
-        self.inport = self.addInPort(inport_name)
-
         response_inport_name = name + '_response_inport'
+
+        self.outport = self.addOutPort(outport_name)
+        self.inport = self.addInPort(inport_name)
         self.response_inport = self.addInPort(response_inport_name)
-        self.next_was_blocked = False
+
+        self.next_is_blocked = False
 
         #setting
         self.working_time = working_time
@@ -296,7 +399,7 @@ class Station(AtomicDEVS):
                 self.state = State_str("busy")
                 return self.state
             else:
-                if self.next_was_blocked == True:
+                if self.next_is_blocked == True:
                     self.state = State_str("block")
                 else:
                     self.state = State_str("ready")
@@ -328,7 +431,7 @@ class Station(AtomicDEVS):
                 
         if response_port_in != None:
             if response_port_in[0] == "pop":
-                self.next_was_blocked = False
+                self.next_is_blocked = False
 
                 if state == "block":
                     self.state = State_str("busy")
@@ -341,7 +444,7 @@ class Station(AtomicDEVS):
                     return self.state
                 
             elif response_port_in[0] == "block":
-                self.next_was_blocked = True
+                self.next_is_blocked = True
 
                 if state == "busy":
                     self.remain_time = self.remain_time - self.elapsed
@@ -359,7 +462,7 @@ class Station(AtomicDEVS):
             if self.is_first_pulse == True:
                 return {self.outport: ["block","fisrt_pulse"] }
             else:
-                if self.next_was_blocked == True:
+                if self.next_is_blocked == True:
                     return {self.outport: ["block","next is block"] }
                 else:
                     return {self.outport: ["pop",self.__product] }
@@ -400,37 +503,7 @@ class Drain(AtomicDEVS):
             raise DEVSException(\
                 "unknown state <%s> in <%s> external transition function"\
                 % (state, self.name))
-        
-class BStation(CoupledDEVS):
-    def __init__(self, name="station",processor_working_time = 10):
-        CoupledDEVS.__init__(self, name)
-        self.name = name
 
-        num = self.name[-1]
-        processor_name = "processor_" + num
-        buffer_name = "buffer_" + num
-        self.buffer = self.addSubModel(Buffer(name=buffer_name))  
-
-        self.working_time = processor_working_time
-        self.station = self.addSubModel(Processor(name=processor_name,working_time=self.working_time))  
-
-        inport_name = self.name + "_inport"
-        outport_name = self.name + "_outport"
-        response_inport_name = self.name + "_response_inport"
-        self.inport = self.addInPort(inport_name)
-        self.outport = self.addOutPort(outport_name)
-        self.response_inport = self.addInPort(response_inport_name)
-
-        self.connectPorts(self.inport, self.buffer.inport)
-        self.connectPorts(self.station.outport, self.buffer.response_inport)
-        self.connectPorts(self.buffer.outport, self.station.inport)
-        self.connectPorts(self.station.outport, self.outport)
-
-    def select(self, imm):
-        if self.station in imm:
-            return self.station
-        elif self.buffer in imm:
-            return self.buffer
 
 # class Conveyor
 
