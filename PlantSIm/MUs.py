@@ -45,6 +45,14 @@ class Part:
         self.set_height(height)
         self.set_elapsed(0)
         self.__log = []
+        self.__dict = {
+             "name" : self.__name,
+             "length" : self.__length,
+             "width" : self.__width,
+             "height" : self.__height,
+             "elapsed" : self.__elpased,
+             "log" : self.__log
+            }
 
     def set_name(self, name):
         self.__name = name
@@ -71,19 +79,12 @@ class Part:
     def set_log(self,log):
         self.__log.append(log)
     
-    def get(self):
-        self.__dict = {
-             "name" : self.__name,
-             "length" : self.__length,
-             "width" : self.__width,
-             "height" : self.__height,
-             "elapsed" : self.__elpased,
-             "log" : self.__log
-            }
-        return self.__dict
-
+    def get(self, key):
+        return self.__dict.get(key)
+    
     def __str__(self):
-        return self.__name
+        return str(self.__dict)
+
     
 class Queue:
     def __init__(self):
@@ -136,15 +137,15 @@ class Stack:
         
 class Out:
     def __init__(self):
-        self._dict = {}
+        self.__dict = {}
     
     def get(self,key):
-        return self._dict.get(key, default=None)
+        return self.__dict.get(key)
     
     def set(self,key,value):
-        self._dict[key] = value
+        self.__dict[key] = value
     
-    def __call__(self):
-        return self._dict
+    def __str__(self):
+        return str(self.__dict)
 
     

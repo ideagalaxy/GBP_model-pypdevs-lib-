@@ -218,6 +218,7 @@ class Buffer(AtomicDEVS):
 
     def extTransition(self, inputs):
         state = self.state.get()
+        print(type(inputs))
         try:    
             port_in =inputs[self.inport]
         except:
@@ -352,6 +353,7 @@ class Station(AtomicDEVS):
                 % (state, self.name))
         
     def extTransition(self, inputs):
+        print(type(inputs))
         try:
             state = self.state.get()
         except:

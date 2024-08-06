@@ -168,7 +168,7 @@ sim = Simulator(OptimalPath1("OptimalPath1"))
 
 
 #sim.setVerbose()
-sim.setTerminationTime(21600)
+sim.setTerminationTime(600)
 sim.setClassicDEVS()
 
 sim.simulate()
