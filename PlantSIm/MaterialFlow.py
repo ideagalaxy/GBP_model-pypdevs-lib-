@@ -392,6 +392,7 @@ class Station(AtomicDEVS):
         self.response_inport = self.addInPort(response_inport_name)
 
         self.next_is_blocked = False
+        self.is_first_pulse = True
 
         #setting
         self.working_time = working_time
@@ -399,12 +400,14 @@ class Station(AtomicDEVS):
 
     def timeAdvance(self):
         state = self.state.get()
+        #print(self.name,"TA",state)
 
         if state == "ready":
             return INFINITY
         elif state == "block":
             return INFINITY
         elif state == "busy":
+            self.current_time += self.remain_time
             return self.remain_time
         else:
             raise DEVSException(\
@@ -413,7 +416,8 @@ class Station(AtomicDEVS):
     
     def intTransition(self):
         state = self.state.get()
-        self.current_time += self.timeAdvance()
+        
+        #print(self.name,self.current_time,"int")
 
         if state == "busy":
             if self.is_first_pulse == True:
@@ -435,6 +439,7 @@ class Station(AtomicDEVS):
     def extTransition(self, inputs):
         state = self.state.get()
         self.current_time += self.elapsed
+        #print(self.name, self.current_time, "ext")
         
         incoming = inputs.get(self.inport, None)
         response = inputs.get(self.response_inport, None)
@@ -551,6 +556,7 @@ inputData = {
     "type"  :["Source", "Buffer", "Station", "Buffer", "Station", "Station", "Drain"],
     "time"  :[2,None,6,4,10,15,None]
 }
+
 
 class LinearLine(CoupledDEVS):
     def __init__(self, name="LinearLine", inputData= {}):
