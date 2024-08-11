@@ -124,7 +124,6 @@ class Buffer(AtomicDEVS):
         
     def intTransition(self):
         state = self.state.get()
-        self.current_time += self.timeAdvance()
 
         if state == "pop":
             if self.inventory.is_empty():
@@ -244,8 +243,8 @@ class Conveyor(AtomicDEVS):
         self.do_pop = True
         self.is_full = False
         self.conveyor = []
-        self.end = []
-        self.remain_time = INFINITY
+        self.remain_time = 0
+
 
         #setting
         self.op_length = length
@@ -258,8 +257,10 @@ class Conveyor(AtomicDEVS):
         if state == "block":
             return INFINITY
         elif state == "ready":
+            self.current_time += self.remain_time
             return self.remain_time
         elif state == "empty":
+            self.current_time += self.remain_time
             return self.remain_time
         elif state == "pop":
             return 0.0
@@ -270,9 +271,30 @@ class Conveyor(AtomicDEVS):
         
     def intTransition(self):
         state = self.state.get()
-        self.current_time += self.timeAdvance()
 
         if state == "empty":
+            for ent in self.conveyor:
+                if ent.get("is_arrive") == False:
+                    end_ent = ent
+                    break
+            end_ent["is_arrive"] = True 
+            end_ent["arr_time"] = None
+
+            if self.do_pop == True:
+                self.state = State_str("pop")
+                return self.state
+            else:
+                self.state = State_str("ready")
+                
+                self.remain_time = INFINITY
+                for ent in self.conveyor:
+                    if ent.get("arr_time") != None:
+                        self.remain_time = ent.get("arr_time")
+                        break
+                
+                return self.state
+
+        elif state == "ready":
             end = self.conveyor[0]
             end["is_arrive"] = True
 
@@ -282,7 +304,7 @@ class Conveyor(AtomicDEVS):
             else:
                 self.state = State_str("ready")
                 self.remain_time = INFINITY
-                return self.state      
+                return self.state          
 
         if state == "pop":
             self.__pop = self.conveyor[0]
@@ -307,6 +329,9 @@ class Conveyor(AtomicDEVS):
 
     def extTransition(self, inputs):
         state = self.state.get()
+        if len(self.conveyor) != 0:
+            if self.conveyor[-1].get("is_arrive") == False:
+                self.current_time -= self.remain_time
         self.current_time += self.elapsed
 
         port_in = inputs.get(self.inport, None)
@@ -315,33 +340,42 @@ class Conveyor(AtomicDEVS):
         # inport
         if port_in:
             if port_in.get("state") == "pop":
+                
+                part_length = port_in.get("part").get("length")
+                
+
+                
+                if len(self.conveyor) != 0:
+                    forward_ent = self.conveyor[-1]
+                    if forward_ent.get("is_arrive") == False:
+                        length = self.speed * self.elapsed  - forward_ent("part_len")
+                        next_time = forward_ent.get("arr_time") + length / self.speed
+                        
+                    else:
+                        length = self.length
+                        next_time = length / self.speed
+                else:
+                    self.length = self.op_length
+                    length = self.op_length
+                    next_time = length / self.speed
+
                 self.conveyor.append({
                     "incoming"  : port_in,
                     "get_time"  : self.current_time,
-                    "distance"  : self.length,
+                    "arr_time"  : next_time,
+                    "part_len"  : part_length,
+                    "distance"  : length,          #distance of forward entity
                     "is_arrive" : False
                 })
 
-                part_length = port_in.get("part").get("length")
-                self.length = self.length - part_length
-
+                self.length - part_length
                 if self.length <= 0:
                     self.is_full = True
 
-                #set time
-                #the first come inside
-                if self.conveyor.is_empty():
-                    self.remain_time = self.length / self.speed
+                front_ent = self.conveyor[0]
+                self.remain_time = self.current_time - front_ent.get("arr_time")
 
-                if state == "empty":
-                    self.remain_time = self.remain_time - self.elapsed
-                    self.state = State_str("empty")
-                    return self.state
-                
-                elif state == "ready":
-                    return self.state
-
-                
+                return self.state              
             
         if response_in:
             if response_in.get("state") == "pop":
@@ -357,13 +391,13 @@ class Conveyor(AtomicDEVS):
                 
                 #Buffer can pop entry
                 else:
-                    
                     #Set state "pop"
                     self.state = State_str("pop")
                     #Release do_pop
                     self.do_pop = False
                     return self.state
-            
+                
+        self.remain_time -= self.elapsed
         return self.state
             
     def outputFnc(self):
@@ -393,14 +427,16 @@ class Station(AtomicDEVS):
 
         self.next_is_blocked = False
         self.is_first_pulse = True
+        self.is_in = False
 
         #setting
         self.working_time = working_time
-        self.remain_time = working_time
+        self.remain_time = 0
+
 
     def timeAdvance(self):
         state = self.state.get()
-        #print(self.name,"TA",state)
+        #print(self.name, self.current_time,"TA",state)
 
         if state == "ready":
             return INFINITY
@@ -417,11 +453,13 @@ class Station(AtomicDEVS):
     def intTransition(self):
         state = self.state.get()
         
+        
         #print(self.name,self.current_time,"int")
 
         if state == "busy":
             if self.is_first_pulse == True:
                 self.is_first_pulse = False
+                self.is_in = True
                 self.remain_time = self.working_time
                 self.state = State_str("busy")
                 return self.state
@@ -429,6 +467,7 @@ class Station(AtomicDEVS):
                 if self.next_is_blocked == True:
                     self.state = State_str("block")
                 else:
+                    self.is_in = False
                     self.state = State_str("ready")
                 return self.state
         else:
@@ -438,6 +477,8 @@ class Station(AtomicDEVS):
         
     def extTransition(self, inputs):
         state = self.state.get()
+        if self.is_in == True and self.next_is_blocked == False:
+            self.current_time -= self.remain_time
         self.current_time += self.elapsed
         #print(self.name, self.current_time, "ext")
         
@@ -501,14 +542,14 @@ class Station(AtomicDEVS):
                     return {self.outport: __out}
                 
                 else:
-                    print(self.name, " out")
+                    #print(self.name, self.current_time, "out")
+                    #print(self.name, " out")
                     __out = self.__product.get("incoming")
                     __out.set("state","pop")
-
-                    elasped_time = self.current_time - self.__product.get("get_time")
-                    print(self.current_time, self.__product.get("get_time"))
                     
-                    __out.set(self.name,elasped_time)
+                    elapsed_time = self.current_time - self.__product.get("get_time")
+                    __out.set(self.name,elapsed_time)
+
                     return {self.outport: __out}
 
 
