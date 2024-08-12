@@ -256,22 +256,28 @@ class Conveyor(AtomicDEVS):
 
         if state == "block":
             return self.remain_time
+        
         elif state == "ready":
             if self.remain_time != INFINITY:
                 self.current_time += self.remain_time
             return self.remain_time
+        
         elif state == "empty":
             if self.remain_time != INFINITY:
                 self.current_time += self.remain_time
             return self.remain_time
+        
         elif state == "pop":
             self.__pop = self.conveyor.pop(0)
             self.length += self.__pop.get("part_len")
             return 0.0
+        
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> time advance transition function"\
                 % (state, self.name))
+        
+
         
     def intTransition(self):
         state = self.state.get()
@@ -469,6 +475,7 @@ class Conveyor(AtomicDEVS):
             else:
                 __out.set("state","block")
                 return {self.outport: __out}
+            
         if state == "ready":
             if self.is_full == True:
                 __out.set("state","block")
