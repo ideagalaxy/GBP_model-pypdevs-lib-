@@ -250,19 +250,16 @@ class Conveyor(AtomicDEVS):
 
     def timeAdvance(self):
         state = self.state.get()
-        print(self.name ,"ta", state, self.current_time)
+        #print("---------------------------------------------------------")
+        #print(f"TA, current_time : {self.current_time}, state : {state}, remain_time : {self.remain_time}")
 
         if state == "block":
             return INFINITY
         
         elif state == "ready":
-            if self.remain_time != INFINITY:
-                self.current_time += self.remain_time
             return self.remain_time
         
         elif state == "empty":
-            if self.remain_time != INFINITY:
-                self.current_time += self.remain_time
             return self.remain_time
         
         elif state == "pop":
@@ -276,7 +273,10 @@ class Conveyor(AtomicDEVS):
         
     def intTransition(self):
         state = self.state.get()
-        print(self.name ,"int", state)
+        if state == "ready" or state == "empty":
+            self.current_time += self.remain_time
+        #print("---------------------------------------------------------")
+        #print(f"INT, current_time : {self.current_time}, state : {state}, remain_time : {self.remain_time}")
 
         #정보 업데이트
         for ent in self.conveyor:
@@ -299,9 +299,12 @@ class Conveyor(AtomicDEVS):
 
             else:
                 #도착했다면?
+                #print("part is arrive")
+                #print(self.conveyor[0])
                 if self.conveyor[0].get("is_arrive") == True:
                     #바로 pop 해야하는 지 체크
                     if self.do_pop == True:
+                        #print("do_pop immediatly")
                         self.state = State_str("pop")
                         return self.state
                     
@@ -310,14 +313,15 @@ class Conveyor(AtomicDEVS):
                         self.state = State_str("ready")
 
                         for ent in self.conveyor:
-                            if ent.get("evnet_time") <= self.current_time:
+                            if ent.get("event_time") <= self.current_time:
                                 self.remain_time = INFINITY
                                 continue
                             else:
                                 tmp = self.op_length / self.speed
-                                if tmp > (ent.get("evnet_time") - self.current_time):
-                                    tmp = ent.get("evnet_time") - self.current_time
+                                if tmp > (ent.get("event_time") - self.current_time):
+                                    tmp = ent.get("event_time") - self.current_time
                                     self.remain_time = tmp
+                        #print(f"set state : ready, remain_time : {self.remain_time}")
                         return self.state
 
         elif state == "ready":
@@ -328,13 +332,13 @@ class Conveyor(AtomicDEVS):
 
 
                 for ent in self.conveyor:
-                    if ent.get("evnet_time") <= self.current_time:
+                    if ent.get("event_time") <= self.current_time:
                         self.remain_time = INFINITY
                         continue
                     else:
                         tmp = self.op_length / self.speed
-                        if tmp > (ent.get("evnet_time") - self.current_time):
-                            tmp = ent.get("evnet_time") - self.current_time
+                        if tmp > (ent.get("event_time") - self.current_time):
+                            tmp = ent.get("event_time") - self.current_time
                             self.remain_time = tmp
                 return self.state
 
@@ -353,6 +357,7 @@ class Conveyor(AtomicDEVS):
             if len(self.conveyor) == 0 :
                 self.remain_time = INFINITY
                 self.state = State_str("empty")
+                #print(f"set state : {self.state}, remain_time = {self.remain_time}")
                 return self.state
             
             if self.conveyor[0].get("is_arrive") == True:
@@ -368,6 +373,9 @@ class Conveyor(AtomicDEVS):
                     if tmp > (ent.get("event_time") - self.current_time):
                         tmp = ent.get("event_time") - self.current_time
                         self.remain_time = tmp
+
+            #print(f"set state : {self.state}, remain_time = {self.remain_time}")
+            return self.state
                         
         else:
             raise DEVSException(\
@@ -376,33 +384,34 @@ class Conveyor(AtomicDEVS):
 
     def extTransition(self, inputs):
         state = self.state.get()
-        print(self.name ,"ext", self.current_time,state)
         self.current_time += self.elapsed
+        #print("---------------------------------------------------------")
+        #print(f"EXT, current_time : {self.current_time}, state : {state}")
 
         port_in = inputs.get(self.inport, None)
         response_in = inputs.get(self.response_inport, None)
+
+        #컨베이어 위에 객체 있으면 정보 업데이트
+        if len(self.conveyor) != 0 and self.elapsed != 0:
+            for ent in self.conveyor:
+                elapsed_distance = self.speed * self.elapsed
+
+                moving_distance = ent.get("moving_distance")
+                possible_distance = ent.get("possible_distance")
+
+                if possible_distance > (moving_distance + elapsed_distance):
+                    #이동거리 업데이트
+                    ent["moving_distance"] = moving_distance + elapsed_distance
+
+                else:
+                    #이동가능거리까지 이동했다는 뜻
+                    ent["moving_distance"] = possible_distance
+                    ent["is_moving"] = False
         
         # inport
         if port_in:
             if port_in.get("state") == "pop":
-                
-                #컨베이어 위에 객체 있으면 정보 업데이트
-                if len(self.conveyor) != 0 and self.elapsed != 0:
-                    for ent in self.conveyor:
-                        elapsed_distance = self.speed * self.elapsed
-
-                        moving_distance = ent.get("moving_distance")
-                        possible_distance = ent.get("possible_distance")
-
-                        if possible_distance > (moving_distance + elapsed_distance):
-                            #이동거리 업데이트
-                            ent["moving_distance"] = moving_distance + elapsed_distance
-
-                        else:
-                            #이동가능거리까지 이동했다는 뜻
-                            ent["moving_distance"] = possible_distance
-                            ent["is_moving"] = False
-
+                #print("EXT port_in")
 
                 #들어온 객체 저장
                 part_length = port_in.get("part").get("length")
@@ -417,10 +426,12 @@ class Conveyor(AtomicDEVS):
                     "is_moving" : True,                                                 #움직이고 있는지 여부
                     "event_time": self.current_time + (self.max_length / self.speed)    #들어오고 이동가능위치에 도착했을 때 시간
                 })
-                
-                self.max_length - part_length
 
-                if self.max_length < 0:
+                #print(f"current_time : {self.current_time}, event_time : {self.current_time + (self.max_length / self.speed)}")
+                self.max_length -= part_length
+                #print("max_length = ", self.max_length)
+
+                if self.max_length <= 0:
                     self.is_full = True
 
 
@@ -436,15 +447,27 @@ class Conveyor(AtomicDEVS):
                         #바로 다음 이벤트 시간까지의 시간으로 설정
                         if tmp > (ev_time - self.current_time):
                             tmp = ev_time - self.current_time
-                            self.remain_time = tmp
-
+                        self.remain_time = tmp
+                #print(f"set state : {self.state}, remain_time = {self.remain_time}")
                 return self.state
       
             
         if response_in:
+            for ent in self.conveyor:
+                ev_time = ent.get("event_time")
+
+                tmp = self.op_length / self.speed
+                if ev_time < self.current_time:
+                    self.remain_time = INFINITY
+                    continue
+                else:
+                    #바로 다음 이벤트 시간까지의 시간으로 설정
+                    if tmp > (ev_time - self.current_time):
+                        tmp = ev_time - self.current_time
+                    self.remain_time = tmp
+
             if response_in.get("state") == "pop":
-                if self.remain_time != INFINITY:
-                    self.remain_time -= self.elapsed
+                #print("response_in : block해제 ")
                 
                 #Save this response
                 self.do_pop = True
@@ -452,47 +475,68 @@ class Conveyor(AtomicDEVS):
 
                 #If Buffer Can't pop entry
                 if state == "empty":
+                    #print("not ready")
                     self.state = State_str("empty")
+                    #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                     return self.state
                 
                 #Buffer can pop entry
                 else:
                     #Set state "pop"
+                    #print("do pop")
                     self.state = State_str("pop")
                     #Release do_pop
                     self.do_pop = False
+                    #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                     return self.state
                 
             elif response_in.get("state") == "block":
-                if self.remain_time != INFINITY:
-                    self.remain_time -= self.elapsed
+                #print("next ent was blocked")
                 self.do_pop = False
+                #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                 return self.state
                 
-        if self.remain_time != INFINITY:
-            self.remain_time -= self.elapsed
+        for ent in self.conveyor:
+            ev_time = ent.get("event_time")
+
+            tmp = self.op_length / self.speed
+            if ev_time < self.current_time:
+                self.remain_time = INFINITY
+                continue
+            else:
+                #바로 다음 이벤트 시간까지의 시간으로 설정
+                if tmp > (ev_time - self.current_time):
+                    tmp = ev_time - self.current_time
+                self.remain_time = tmp
+        #print(f"set state : {self.state}, remain_time : {self.remain_time}")
         return self.state
             
     def outputFnc(self):
         state = self.state.get()
+        #print("---------------------------------------------------------")
+        #print(f"OUT, current_time = {self.current_time}, state : {state}")
         
-        #print(state)
+        ##print(state)
         __out = Out()
 
         if state == "pop":
             if self.is_full == False:
+                #print("doing pop")
                 __out = self.__pop.get("incoming")
                 __out.set("state",state)
                 
                 elased_time = self.current_time - self.__pop.get("get_time")
                 __out.set(self.name,elased_time)
-                #print("out")
+                ##print("out")
                 return {self.outport: __out}
             else:
+                #print("block signal")
                 __out.set("state","block")
                 return {self.outport: __out}
+            
         if state == "ready":
             if self.is_full == True:
+                #print("block signal")
                 __out.set("state","block")
                 __out.set("msg", "conveyor is full")
                 return {self.outport: __out}
@@ -501,7 +545,11 @@ class Conveyor(AtomicDEVS):
                 return {self.outport: __out}
             
         if state == "empty":
-            __out.set("state","empty")
+            #print("not ready")
+            if self.is_full:
+                __out.set("state","block")
+            else:
+                __out.set("state","empty")
             return {self.outport: __out}
 
         
@@ -532,7 +580,7 @@ class Station(AtomicDEVS):
 
     def timeAdvance(self):
         state = self.state.get()
-        #print(self.name, self.current_time,"TA",state)
+        ##print(self.name, self.current_time,"TA",state)
 
         if state == "ready":
             return INFINITY
@@ -550,7 +598,7 @@ class Station(AtomicDEVS):
         state = self.state.get()
         
         
-        #print(self.name,self.current_time,"int")
+        ##print(self.name,self.current_time,"int")
 
         if state == "busy":
             if self.is_first_pulse == True:
@@ -576,7 +624,7 @@ class Station(AtomicDEVS):
         if self.is_in == True and self.next_is_blocked == False:
             self.current_time -= self.remain_time
         self.current_time += self.elapsed
-        #print(self.name, self.current_time, "ext")
+        ##print(self.name, self.current_time, "ext")
         
         incoming = inputs.get(self.inport, None)
         response = inputs.get(self.response_inport, None)
@@ -638,8 +686,8 @@ class Station(AtomicDEVS):
                     return {self.outport: __out}
                 
                 else:
-                    #print(self.name, self.current_time, "out")
-                    #print(self.name, " out")
+                    ##print(self.name, self.current_time, "out")
+                    ##print(self.name, " out")
                     __out = self.__product.get("incoming")
                     __out.set("state","pop")
                     
@@ -723,8 +771,8 @@ class LinearLine(CoupledDEVS):
             self.variable_name.append(name)
             self.variable_type.append(type)
 
-        print(self.variable_name)
-        print(self.variable_type)
+        #print(self.variable_name)
+        #print(self.variable_type)
 
         for i in range(len(self.variable_name)-1):
             val_now = getattr(self, self.variable_name[i])
@@ -755,7 +803,7 @@ class LinearLine(CoupledDEVS):
 
 sim = Simulator(LinearLine("LinearLine",inputData=inputData))
 
-#sim.setVerbose()
+sim.setVerbose()
 sim.setTerminationTime(60)
 sim.setClassicDEVS()
 
