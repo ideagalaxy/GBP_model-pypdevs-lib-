@@ -370,37 +370,24 @@ class Conveyor(AtomicDEVS):
         if port_in:
             if port_in.get("state") == "pop":
                 
+                if len(self.conveyor) != 0 and self.elapsed != 0:
+                    for ent in self.conveyor:
+                        elapsed_distance = self.speed * self.elapsed
+
+                #들어온 객체 저장
                 part_length = port_in.get("part").get("length")
-
-                #들어왔을 때 컨베이어 위에 객체가 있을 경우
-                if len(self.conveyor) != 0:
-                    forward_ent = self.conveyor[-1]
-
-                    #끝에 도착 못한 경우
-                    if forward_ent.get("is_arrive") == False:
-                        #앞에 객체와 거리차이 계산
-                        length = self.speed * self.elapsed  - forward_ent.get("part_len")   #이동거리 - 파트길이
-                        next_time = forward_ent.get("arr_time") + length / self.speed       
-
-                    #끝에 도착 한 경우
-                    else:
-                        length = self.length
-                        next_time = length / self.speed
-
-                #들어왔을 때 컨베이어 위에 객체가 없을 경우
-                else:
-                    self.length = self.op_length
-                    length = self.op_length
-                    next_time = length / self.speed
-
                 self.conveyor.append({
-                    "incoming"  : port_in,
-                    "get_time"  : self.current_time,
-                    "arr_time"  : next_time,
-                    "part_len"  : part_length,
-                    "distance"  : length,          #distance of forward entity
-                    "is_arrive" : False
+                    "incoming"  : port_in,              #들어온 객체 저장
+                    "get_time"  : self.current_time,    #들어온 시점
+                    "distance"  : 0,                    #현재 위치(앞부분 기준)
+                    "part_len"  : part_length,          #파트 길이
+                    "is_arrive" : False                 #도착 여부
                 })
+                
+                
+
+
+                
 
                 self.length - part_length
 
