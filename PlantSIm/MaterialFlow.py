@@ -16,6 +16,8 @@ from pypdevs.simulator import Simulator
 from MUs import *
 
 
+
+
     
 class Source(AtomicDEVS):               #Source will create 'Part' object
 
@@ -552,10 +554,14 @@ class Conveyor(AtomicDEVS):
                 __out.set("state","empty")
             return {self.outport: __out}
 
-        
-        
+
+   
 class Station(AtomicDEVS):
-    def __init__(self, name = 'station', working_time = 10):
+    '''
+    working_time = [mu,sigma,lower,upper]
+    if sigma = 0 , than working_time will set const mu
+    '''
+    def __init__(self, name = 'station', working_time = [10,0,0,0]):
         AtomicDEVS.__init__(self, name)
         self.name = name
         self.state = State_str("ready")
@@ -574,9 +580,26 @@ class Station(AtomicDEVS):
         self.is_in = False
 
         #setting
-        self.working_time = working_time
+        self.working_time_setting = working_time
         self.remain_time = 0
 
+    def generate_normal(self,setting):
+        import scipy.stats as stats
+        mu = setting[0]
+        sigma = setting[1]
+        lower = setting[2]
+        upper = setting[3]
+
+        if sigma == 0:
+            return mu
+        
+        low = (lower - mu) / sigma
+        upp = (upper - mu) / sigma
+        
+        #make randnum
+        samples = stats.truncnorm.rvs(low, upp, loc=mu, scale=sigma, size=1)
+        working_time = int(samples[0])
+        return working_time
 
     def timeAdvance(self):
         state = self.state.get()
@@ -597,14 +620,13 @@ class Station(AtomicDEVS):
     def intTransition(self):
         state = self.state.get()
         
-        
         ##print(self.name,self.current_time,"int")
 
         if state == "busy":
             if self.is_first_pulse == True:
                 self.is_first_pulse = False
                 self.is_in = True
-                self.remain_time = self.working_time
+                self.remain_time = self.generate_normal(self.working_time_setting)
                 self.state = State_str("busy")
                 return self.state
             else:
@@ -697,6 +719,7 @@ class Station(AtomicDEVS):
                     return {self.outport: __out}
 
 class Drain(AtomicDEVS):
+
     def __init__(self, name = 'drain'):
         AtomicDEVS.__init__(self, name)
         self.name = name

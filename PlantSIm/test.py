@@ -1,27 +1,30 @@
 from pypdevs.simulator import Simulator
 from MaterialFlow import Gen_LINE
 
+import itertools
+
+
+
 inputData = {
-    "name"  :["source","source_buffer", "station_1",    "conveyor_1",   "station_2",    "result"],
-    "type"  :["Source", "Buffer",       "Station",      "Conveyor",     "Station",      "Drain"],
-    "time"  :[2,        None,           2,              2,              10,             None]
+    "name"  :["source","source_buffer", "station_1",    "conveyor_1",   "station_2",    "station_3",    "conveyor_2",   "station_4",    "station_5",    "conveyor_3",   "station_6",    "result"],
+    "type"  :["Source", "Buffer",       "Station",      "Conveyor",     "Station",      "Station",      "Conveyor",     "Station",      "Station",      "Conveyor",     "Station",      "Drain"],
+    "time"  :[2,        None,           [2,1,1,5],      2,              [4,2,2,5],     [2,1,1,5],      2,              [10,3,5,15],     [15,5,10,20],      2,           [10,3,5,15],     None]
 }
-'''
+
 sim = Simulator(Gen_LINE("LinearLine",inputData=inputData))
 
 #sim.setVerbose()
-sim.setTerminationTime(200)
+sim.setTerminationTime(21600)
 sim.setClassicDEVS()
 
 sim.simulate()
 
 print("-------------------------------")
 print(sim.model.result.count)
+
+
+
 '''
-
-
-import itertools
-
 model_dict = {
     "station_1" : 38.57,
     "station_2" : 34.44,
@@ -33,17 +36,14 @@ model_dict = {
 
 
 arr = ["Station","Station","Station","Station","Conveyor"]
-# 모든 순열을 구한 후, 중복을 제거
 unique_permutations = set(itertools.permutations(arr))
 
 
 
 best_comb = None
-best_result = None
+best_result = None.
 # 결과 출력
 for perm in unique_permutations:
-
-
 
     inputData = {}
     name = ["source","source_buffer","station_1"]
@@ -105,3 +105,4 @@ for perm in unique_permutations:
 print(best_comb)
 print(best_result)
 
+'''
