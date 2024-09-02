@@ -719,7 +719,6 @@ class Station(AtomicDEVS):
                     return {self.outport: __out}
 
 class Drain(AtomicDEVS):
-
     def __init__(self, name = 'drain'):
         AtomicDEVS.__init__(self, name)
         self.name = name
@@ -754,7 +753,73 @@ class Drain(AtomicDEVS):
         else:
             self.state = State_arr(["get", self.count])
             return self.state
+    
+    
 
+class Seperator(AtomicDEVS):
+    def __init__(self, name = 'seperator', out_way = 3):
+        AtomicDEVS.__init__(self, name)
+        self.name = name
+        self.state = State_str("ready")
+        self.out_way = out_way
+        self.num = 0
+
+        inport_name = name + '_inport'
+        self.inport = self.addInPort(inport_name)
+
+        for num in range(out_way):
+            outport_name = name + "_outport_" + str(num)
+            val_name = "outport_" + str(num)
+            setattr(self, val_name, self.addInPort(outport_name))
+            
+    def timeAdvance(self):
+        state = self.state.get()
+
+        if state == "ready":
+            return 0.0
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> time advance transition function"\
+                % (state, self.name))
+    
+    def extTransition(self, inputs):
+        port_in =inputs[self.inport]
+
+        self.incoming = port_in
+
+        return self.state
+    
+    def outputFnc(self):
+        for out_num in range(self.out_way):
+            if self.num == out_num:
+                _outport_name = "outport_"+str(self.num)
+                outport_value = getattr(self, _outport_name)
+                if self.num < self.out_way:
+                    self.num += 1
+                else:
+                    self.num = 0
+
+                return {outport_value: self.incoming}
+
+
+class Cell(CoupledDEVS):
+    def __init__(self, name="cell"):
+        CoupledDEVS.__init__(self, name)
+
+        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=3))
+
+        self.conveyor1 = self.addSubModel(Conveyor(name="conveyor1"))
+        self.station1 = self.addSubModel(Station(name="station1"))
+        self.conveyor2 = self.addSubModel(Conveyor(name="conveyor2"))
+        self.station2 = self.addSubModel(Station(name="station2"))
+        self.conveyor3 = self.addSubModel(Conveyor(name="conveyor3"))
+        self.station3 = self.addSubModel(Station(name="station3"))
+
+        self.buffer = self.addSubModel(Buffer(name="buffer"))
+
+
+
+        
 
 class Gen_LINE(CoupledDEVS):
     def __init__(self, name="Gen_LINE", inputData= {}):
