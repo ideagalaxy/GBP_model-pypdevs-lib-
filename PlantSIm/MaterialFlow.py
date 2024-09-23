@@ -821,11 +821,11 @@ class Seperator(AtomicDEVS):
             if self.num == out_num:
                 _outport_name = "outport_"+str(self.num)
                 outport_value = getattr(self, _outport_name)
+                self.incoming.set("seperator",_outport_name)
                 if self.num < self.out_way-1:
                     self.num += 1
                 else:
                     self.num = 0
-                print(self.incoming)
                 return {outport_value: self.incoming}
 
 
@@ -887,7 +887,9 @@ class Cell(CoupledDEVS):
         self.connectPorts(self.seperator.outport_1, self.line1.inport)
         self.connectPorts(self.seperator.outport_2, self.line2.inport)
 
+        self.connectPorts(self.line0.outport, self.buffer.inport)
         self.connectPorts(self.line1.outport, self.buffer.inport)
+        self.connectPorts(self.line2.outport, self.buffer.inport)
 
         self.connectPorts(self.response_inport, self.buffer.response_inport)
         self.connectPorts(self.buffer.outport, self.outport)
@@ -946,7 +948,8 @@ class Test(CoupledDEVS):
 sim = Simulator(Test("Test"))
 
 sim.setVerbose()
-sim.setTerminationTime(200)
+sim.setTerminationTime(100)
+
 sim.setClassicDEVS()
 
 sim.simulate()
@@ -975,7 +978,7 @@ class Gen_LINE(CoupledDEVS):
                 setattr(self,name,self.addSubModel(Conveyor(name=name,length=time)))
 
             elif type == "Cell":
-                setattr(self,name,self.addSubModel(Cell(name=name,length=time)))
+                setattr(self,name,self.addSubModel(Cell(name=name)))
             
 
             elif type == "Station":
@@ -999,8 +1002,8 @@ class Gen_LINE(CoupledDEVS):
             now_type = self.variable_type[i]
             next_type = self.variable_type[i+1]
         
-            if now_type == "Station" or now_type == "Buffer" or now_type == "Conveyor" :
-                if next_type == "Station" or next_type == "Buffer" or next_type == "Conveyor":
+            if now_type == "Station" or now_type == "Buffer" or now_type == "Conveyor" or now_type == "Cell" :
+                if next_type == "Station" or next_type == "Buffer" or next_type == "Conveyor":    
                     val_response_outport = val_next.outport
                     val_response_inport = val_now.response_inport
                     self.connectPorts(val_response_outport, val_response_inport)

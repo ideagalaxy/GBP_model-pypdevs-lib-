@@ -84,7 +84,7 @@ class Part:
         return self.__dict.get(key)
     
     def __str__(self):
-        return str(self.__dict)
+        return str(self.__name)
 
     
 class Queue:
