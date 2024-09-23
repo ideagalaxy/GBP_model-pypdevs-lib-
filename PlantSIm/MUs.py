@@ -72,6 +72,7 @@ class Part:
     
     def set_elapsed(self,elapsed):
         self.__elpased = elapsed
+        return self.__elpased
 
     def get_elapsed(self):
         return self.__dict["elapsed"]

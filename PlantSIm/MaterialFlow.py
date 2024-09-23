@@ -781,20 +781,42 @@ class Seperator(AtomicDEVS):
         state = self.state.get()
 
         if state == "ready":
+            return INFINITY
+        elif state == "pop":
             return 0.0
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> time advance transition function"\
+                % (state, self.name))
+        
+    def intTransition(self):
+        state = self.state.get()
+        
+        ##print(self.name,self.current_time,"int")
+
+        if state == "pop":
+            self.state = State_str("ready")
+
+            return self.state
+            
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> internal transition function"\
                 % (state, self.name))
     
     def extTransition(self, inputs):
         port_in =inputs[self.inport]
 
         self.incoming = port_in
+        if self.incoming.get("state") == "pop":
+            self.state = State_str("pop")
+        else:
+            self.state = State_str("ready")
 
         return self.state
     
     def outputFnc(self):
+
         for out_num in range(self.out_way):
             if self.num == out_num:
                 _outport_name = "outport_"+str(self.num)
@@ -803,45 +825,10 @@ class Seperator(AtomicDEVS):
                     self.num += 1
                 else:
                     self.num = 0
-
+                print(self.incoming)
                 return {outport_value: self.incoming}
 
-'''
-class LinearLine(CoupledDEVS):
-    def __init__(self, name="LinearLine"):
-        CoupledDEVS.__init__(self, name)
-        self.storage = self.addSubModel(Storage(name="storage"))        #outport, response_inport
 
-        self.station_1 = self.addSubModel(Station(name="station_1"))    #outport, inport, response_inport
-        self.station_2 = self.addSubModel(Station(name="turn_1"))
-        self.station_3 = self.addSubModel(Station(name="station_3"))
-
-        self.result = self.addSubModel(Drain(name="result"))            #inport,outport
-        
-        #connect outports >> inports
-        self.connectPorts(self.storage.outport, self.station_1.inport)
-        self.connectPorts(self.station_1.outport, self.station_2.inport)
-        self.connectPorts(self.station_2.outport, self.station_3.inport)
-        self.connectPorts(self.station_3.outport, self.result.inport)
-
-        #connect outports >> response_inport
-        self.connectPorts(self.result.outport, self.station_3.response_inport)
-        self.connectPorts(self.station_3.outport, self.station_2.response_inport)
-        self.connectPorts(self.station_2.outport, self.station_1.response_inport)
-        self.connectPorts(self.station_1.outport, self.storage.response_inport)
-
-    def select(self, imm):
-        if self.result in imm:
-            return self.result
-        elif self.station_3 in imm:
-            return self.station_3
-        elif self.station_2 in imm:
-            return self.station_2
-        elif self.station_1 in imm:
-            return self.station_1
-        elif self.storage in imm:
-            return self.storage
-'''
 
 class Line_in_Cell(CoupledDEVS):
     def __init__(self, name="LinC", inputData= {}):
@@ -854,6 +841,7 @@ class Line_in_Cell(CoupledDEVS):
 
         self.inport = self.addInPort(name="LC_in")
         self.outport = self.addOutPort(name="LC_out")
+        self.response_inport = self.addInPort(name="LC_response")
 
         self.connectPorts(self.inport, self.conveyor1.inport)
 
@@ -922,24 +910,33 @@ class Test(CoupledDEVS):
 
         self.source = self.addSubModel(Source(name="source",interval=2))
         self.buffer = self.addSubModel(Buffer(name="buffer"))
+
+        self.station_first = self.addSubModel(Station(name="station_first"))
+
         self.cell = self.addSubModel(Cell(name="cell"))
-        self.station = self.addSubModel(Station(name="station-last"))
+        #self.line0 = self.addSubModel(Line_in_Cell(name="LinC0"))
+
+        self.station_last = self.addSubModel(Station(name="station_last"))
         self.result = self.addSubModel(Drain(name="result"))
 
         self.connectPorts(self.source.outport, self.buffer.inport)
-        self.connectPorts(self.buffer.outport, self.cell.inport)
-        self.connectPorts(self.cell.outport, self.station.inport)
-        self.connectPorts(self.station.outport, self.result.inport)
+        self.connectPorts(self.buffer.outport, self.station_first.inport)
+        self.connectPorts(self.station_first.outport, self.cell.inport)
+        self.connectPorts(self.cell.outport, self.station_last.inport)
+        self.connectPorts(self.station_last.outport, self.result.inport)
 
-        self.connectPorts(self.station.outport, self.cell.response_inport)
+        self.connectPorts(self.station_last.outport, self.cell.response_inport)
+        self.connectPorts(self.station_first.outport, self.buffer.response_inport)
 
     def select(self, imm):
         if self.result in imm:
             return self.result
-        elif self.station in imm:
-            return self.station
+        elif self.station_last in imm:
+            return self.station_last
         elif self.cell in imm:
             return self.cell
+        elif self.station_first in imm:
+            return self.station_first
         elif self.buffer in imm:
             return self.buffer
         elif self.source in imm:
@@ -976,6 +973,10 @@ class Gen_LINE(CoupledDEVS):
 
             elif type == "Conveyor":
                 setattr(self,name,self.addSubModel(Conveyor(name=name,length=time)))
+
+            elif type == "Cell":
+                setattr(self,name,self.addSubModel(Cell(name=name,length=time)))
+            
 
             elif type == "Station":
                 setattr(self,name,self.addSubModel(Station(name=name,working_time=time)))
