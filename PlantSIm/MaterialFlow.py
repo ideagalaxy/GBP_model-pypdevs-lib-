@@ -821,7 +821,7 @@ class Seperator(AtomicDEVS):
             if self.num == out_num:
                 _outport_name = "outport_"+str(self.num)
                 outport_value = getattr(self, _outport_name)
-                if self.num < self.out_way:
+                if self.num < self.out_way-1:
                     self.num += 1
                 else:
                     self.num = 0
@@ -946,7 +946,7 @@ class Test(CoupledDEVS):
 sim = Simulator(Test("Test"))
 
 sim.setVerbose()
-sim.setTerminationTime(60)
+sim.setTerminationTime(200)
 sim.setClassicDEVS()
 
 sim.simulate()
