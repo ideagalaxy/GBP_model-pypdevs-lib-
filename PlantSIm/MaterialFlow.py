@@ -14,6 +14,7 @@ import random
 from pypdevs.simulator import Simulator
 
 from MUs import *
+from GenerateCell import Cell
 
 
 
@@ -829,85 +830,8 @@ class Seperator(AtomicDEVS):
                 return {outport_value: self.incoming}
 
 
-
-class Line_in_Cell(CoupledDEVS):
-    def __init__(self, name="LinC", inputData= {}):
-        CoupledDEVS.__init__(self, name)
-
-        self.conveyor1 = self.addSubModel(Conveyor(name="conveyor1"))
-        self.station1 = self.addSubModel(Station(name="station1"))
-        self.station2 = self.addSubModel(Station(name="station2"))
-        self.conveyor2 = self.addSubModel(Conveyor(name="conveyor2"))
-
-        self.inport = self.addInPort(name="LC_in")
-        self.outport = self.addOutPort(name="LC_out")
-        self.response_inport = self.addInPort(name="LC_response")
-
-        self.connectPorts(self.inport, self.conveyor1.inport)
-
-        self.connectPorts(self.conveyor1.outport, self.station1.inport)
-        self.connectPorts(self.station1.outport, self.station2.inport)
-        self.connectPorts(self.station2.outport, self.conveyor2.inport)
-
-        self.connectPorts(self.conveyor2.outport, self.station2.response_inport)
-        self.connectPorts(self.station2.outport, self.station1.response_inport)
-        self.connectPorts(self.station1.outport, self.conveyor1.response_inport)
-
-        self.connectPorts(self.conveyor2.outport, self.outport)
-
-    def select(self, imm):
-        if self.conveyor2 in imm:
-            return self.conveyor2
-        elif self.station2 in imm:
-            return self.station2
-        elif self.station1 in imm:
-            return self.station1
-        elif self.conveyor1 in imm:
-            return self.conveyor1
-
-class Cell(CoupledDEVS):
-    def __init__(self, name="cell"):
-        CoupledDEVS.__init__(self, name)
-
-        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=3))
-
-        self.line0 = self.addSubModel(Line_in_Cell(name="LinC0"))
-        self.line1 = self.addSubModel(Line_in_Cell(name="LinC1"))
-        self.line2 = self.addSubModel(Line_in_Cell(name="LinC2"))
-
-        self.buffer = self.addSubModel(Buffer(name="buffer"))
-
-        self.inport = self.addInPort(name="Cell_in")
-        self.outport = self.addOutPort(name="Cell_out")
-        self.response_inport = self.addInPort(name="Cell_response_inport")
-
-        self.connectPorts(self.inport, self.seperator.inport)
-
-        self.connectPorts(self.seperator.outport_0, self.line0.inport)
-        self.connectPorts(self.seperator.outport_1, self.line1.inport)
-        self.connectPorts(self.seperator.outport_2, self.line2.inport)
-
-        self.connectPorts(self.line0.outport, self.buffer.inport)
-        self.connectPorts(self.line1.outport, self.buffer.inport)
-        self.connectPorts(self.line2.outport, self.buffer.inport)
-
-        self.connectPorts(self.response_inport, self.buffer.response_inport)
-        self.connectPorts(self.buffer.outport, self.outport)
-
-    def select(self, imm):
-        if self.buffer in imm:
-            return self.buffer
-        elif self.line2 in imm:
-            return self.line2
-        elif self.line1 in imm:
-            return self.line1
-        elif self.line0 in imm:
-            return self.line0
-        elif self.seperator in imm:
-            return self.seperator
-
 class Test(CoupledDEVS):
-    def __init__(self, name="Test"):
+    def __init__(self, name):
         CoupledDEVS.__init__(self, name)
 
         self.source = self.addSubModel(Source(name="source",interval=2))
@@ -956,62 +880,6 @@ sim.simulate()
 
         
 
-class Gen_LINE(CoupledDEVS):
-    def __init__(self, name="Gen_LINE", inputData= {}):
-        CoupledDEVS.__init__(self, name)
-        self.variable_name = []
-        self.variable_type = []
-        for i in range(len(inputData["name"])):
-            name = inputData["name"][i]
-            type = inputData["type"][i]
-            time = inputData["time"][i]
-            if type == "Source":
-                setattr(self,name,self.addSubModel(Source(name=name, interval=time)))
-            
-            elif type == "Buffer":
-                if time == None:
-                    setattr(self,name,self.addSubModel(Buffer(name=name)))
-                else:
-                    setattr(self,name,self.addSubModel(Buffer(name=name, capacity= time)))
 
-            elif type == "Conveyor":
-                setattr(self,name,self.addSubModel(Conveyor(name=name,length=time)))
-
-            elif type == "Cell":
-                setattr(self,name,self.addSubModel(Cell(name=name)))
-            
-
-            elif type == "Station":
-                setattr(self,name,self.addSubModel(Station(name=name,working_time=time)))
-
-            else:
-                setattr(self,name,self.addSubModel(Drain(name=name)))
-            self.variable_name.append(name)
-            self.variable_type.append(type)
-
-        #print(self.variable_name)
-        #print(self.variable_type)
-
-        for i in range(len(self.variable_name)-1):
-            val_now = getattr(self, self.variable_name[i])
-            val_next = getattr(self, self.variable_name[i+1])
-            val_outport = val_now.outport
-            val_inport = val_next.inport
-            self.connectPorts(val_outport,val_inport)
-
-            now_type = self.variable_type[i]
-            next_type = self.variable_type[i+1]
-        
-            if now_type == "Station" or now_type == "Buffer" or now_type == "Conveyor" or now_type == "Cell" :
-                if next_type == "Station" or next_type == "Buffer" or next_type == "Conveyor":    
-                    val_response_outport = val_next.outport
-                    val_response_inport = val_now.response_inport
-                    self.connectPorts(val_response_outport, val_response_inport)
-
-    def select(self, imm):
-        for var_name in reversed(self.variable_name):
-            var_value = getattr(self, var_name)
-            if var_value in imm:
-                return var_value
         
 
