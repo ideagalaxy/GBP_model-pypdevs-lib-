@@ -14,7 +14,7 @@ import random
 from pypdevs.simulator import Simulator
 
 from MUs import *
-from GenerateCell import Cell
+#from GenerateCell import Cell
 
 
 
@@ -829,7 +829,7 @@ class Seperator(AtomicDEVS):
                     self.num = 0
                 return {outport_value: self.incoming}
 
-
+'''
 class Test(CoupledDEVS):
     def __init__(self, name):
         CoupledDEVS.__init__(self, name)
@@ -878,7 +878,7 @@ sim.setClassicDEVS()
 
 sim.simulate()
 
-        
+        '''
 
 
         

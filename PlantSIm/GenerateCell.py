@@ -7,6 +7,35 @@ from MUs import *
 from MaterialFlow import Source, Conveyor, Buffer, Drain, Station, Seperator
 
 
+class Tasks_Cell(CoupledDEVS):
+    def __init__(self, name="Tasks_Cell", task_num = 3):
+        CoupledDEVS.__init__(self, name)
+        self.task_num = task_num
+
+        self.inport = self.addInPort(name="Tasks_Cell_in")
+        self.outport = self.addOutPort(name="Tasks_Cell_out")
+
+        for i in range(task_num):
+            station_name = name + "_station_" + str(i+1)
+            setattr(self,name,self.addSubModel(Station(name=station_name, interval=param)))
+
+
+
+
+
+
+class Parallel_Cell(CoupledDEVS):
+    def __init__(self, name="Parallel_Cell", line_num = 2, task_num = 3, cycle_time = 4):
+        CoupledDEVS.__init__(self, name)
+
+
+class Block_Cell(CoupledDEVS):
+    def __init__(self, name="Block_Cell", line_num = 2, task_num = 3, cycle_time = 4):
+        CoupledDEVS.__init__(self, name)
+
+
+
+
 class Create_subLine(CoupledDEVS):
     def sub():
         return Create_subLine()

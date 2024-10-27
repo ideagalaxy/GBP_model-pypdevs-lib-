@@ -4,43 +4,43 @@ from GenerateCell import *
 from pypdevs.simulator import Simulator
 import pandas as pd
 
-class Data_preprocessing():
-    def preprocessing(input):
+class Data_preprocessing:
+    def __init__(self):
+        pass
+
+    def getType(self,input):
         el_type = input['Type'].tolist()
+
+        return el_type
+
+    def getName(self,input):
+        el_type = self.getType(input)
         el_name = []
 
         station_num = 1
         cell_num = 1
         
-        previous_type = None
         for type in el_type:
-            if previous_type == None:
-                previous_type = type
+            
+            if "Cell" in type:
+                _name = "Cell_" + str(cell_num)
+                cell_num += 1
+                el_name.append(_name)
+            elif type == "Station":
+                _name = "Station_" + str(station_num)
+                station_num += 1
+                el_name.append(_name)
             else:
-                tmp = 0
-                if previous_type == "Conveyor" and type == "Conveyor":
-                    tmp += 1
-
-                else:
-                    #convyor 처리해야함
-                    
-                    if type == "Cell":
-                        _name = "Cell_" + str(cell_num)
-                        cell_num += 1
-                        el_name.append(_name)
-                    elif type == "Station":
-                        _name = "Station_" + str(station_num)
-                        station_num += 1
-                        el_name.append(_name)
-                    else:
-                        el_name.append(type)
-
-        result  = {
-            "name" : el_name,
-            "type" : el_type
-            }
+                el_name.append(type)
         
-        return result
+        return el_name
+    
+    def getParam(self,input):
+        el_type = self.getType(input)
+        el_param = []
+
+        return el_param
+
 
 
 
