@@ -18,7 +18,7 @@ class Tasks_Cell(CoupledDEVS):
         self.variable_name = []
         for i in range(task_num):
             station_name = name + "_station_" + str(i+1)
-            setattr(self,station_name,self.addSubModel(Station(name=station_name, interval=[param,0,0,0])))
+            setattr(self,station_name,self.addSubModel(Station(name=station_name, working_time=[param,0,0,0])))
             self.variable_name.append(station_name)
         
         for i in range(len(self.variable_name)-1):
@@ -47,67 +47,56 @@ class Tasks_Cell(CoupledDEVS):
 
 
 
+def is_odd(line_num):
+    if line_num % 2 == 0 :
+        return False
+    else:
+        return True
 
 
 class Parallel_Cell(CoupledDEVS):
-    def __init__(self, name="Parallel_Cell", line_num = 2, task_num = 3, cycle_time = 4):
+    def __init__(self, name="Parallel_Cell", size = [3,4], line_num = 2, task_num = 3, cycle_time = 4):
         CoupledDEVS.__init__(self, name)
+
+        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=line_num))
+
+        if is_odd(line_num):
+            
+        else:
+            size_x = size[0]
+            for i in range(line_num/2):
+                Conveyor_length = 2 * (size_x / line_num)
+
+
 
 
 class Block_Cell(CoupledDEVS):
-    def __init__(self, name="Block_Cell", line_num = 2, task_num = 3, cycle_time = 4):
+    def __init__(self, name="Block_Cell", size = [3,4], line_num = 2, task_num = 3, cycle_time = 4):
         CoupledDEVS.__init__(self, name)
 
+        is_odd = is_odd(line_num)
+
+        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=line_num))
+
+        for line in range(line_num):
+            conveyor_in_name = "line"+str(line)+"_conveyor_in"
+            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, working_time=[param,0,0,0])))
+
+            task_name = "line"+str(line)+"_station"
+            setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, param=cycle_time)))
+
+            conveyor_out_name = "line"+str(line)+"_conveyor_out"
+            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, working_time=[param,0,0,0])))
 
 
 
-class Create_subLine(CoupledDEVS):
-    def sub():
-        return Create_subLine()
-
-class Gen_Cell():
-    def gen_cell(inputData = {}):
-        size = inputData["size"]
-        sublines = inputData["sublines"]
-        inport = inputData["inport"]
-        outport = inputData["outport"]
 
 
 
-class Line_in_Cell(CoupledDEVS):
-    def __init__(self, name="LinC"):
-        CoupledDEVS.__init__(self, name)
 
-        self.conveyor1 = self.addSubModel(Conveyor(name="conveyor1"))
-        self.station1 = self.addSubModel(Station(name="station1"))
-        self.station2 = self.addSubModel(Station(name="station2"))
-        self.conveyor2 = self.addSubModel(Conveyor(name="conveyor2"))
 
-        self.inport = self.addInPort(name="LC_in")
-        self.outport = self.addOutPort(name="LC_out")
-        self.response_inport = self.addInPort(name="LC_response")
 
-        self.connectPorts(self.inport, self.conveyor1.inport)
 
-        self.connectPorts(self.conveyor1.outport, self.station1.inport)
-        self.connectPorts(self.station1.outport, self.station2.inport)
-        self.connectPorts(self.station2.outport, self.conveyor2.inport)
-
-        self.connectPorts(self.conveyor2.outport, self.station2.response_inport)
-        self.connectPorts(self.station2.outport, self.station1.response_inport)
-        self.connectPorts(self.station1.outport, self.conveyor1.response_inport)
-
-        self.connectPorts(self.conveyor2.outport, self.outport)
-
-    def select(self, imm):
-        if self.conveyor2 in imm:
-            return self.conveyor2
-        elif self.station2 in imm:
-            return self.station2
-        elif self.station1 in imm:
-            return self.station1
-        elif self.conveyor1 in imm:
-            return self.conveyor1
 
 class Cell(CoupledDEVS):
     def __init__(self, name="cell"):
