@@ -8,16 +8,41 @@ from MaterialFlow import Source, Conveyor, Buffer, Drain, Station, Seperator
 
 
 class Tasks_Cell(CoupledDEVS):
-    def __init__(self, name="Tasks_Cell", task_num = 3):
+    def __init__(self, name="Tasks_Cell", task_num = 3, param = 12):
         CoupledDEVS.__init__(self, name)
         self.task_num = task_num
 
         self.inport = self.addInPort(name="Tasks_Cell_in")
         self.outport = self.addOutPort(name="Tasks_Cell_out")
 
+        self.variable_name = []
         for i in range(task_num):
             station_name = name + "_station_" + str(i+1)
-            setattr(self,name,self.addSubModel(Station(name=station_name, interval=param)))
+            setattr(self,station_name,self.addSubModel(Station(name=station_name, interval=[param,0,0,0])))
+            self.variable_name.append(station_name)
+        
+        for i in range(len(self.variable_name)-1):
+            cur_station = getattr(self,self.variable_name[i])
+            nex_station = getattr(self,self.variable_name[i+1])
+
+            if i == 0:
+                self.connectPorts(self.inport,cur_station.inport)
+
+            self.connectPorts(cur_station.outport,nex_station.inport)
+            self.connectPorts(nex_station.outport,cur_station.response_inport)
+            last_station = nex_station
+        
+        self.connectPorts(last_station.outport, self.outport)
+        
+    def select(self, imm):
+        for var_name in reversed(self.variable_name):
+            var_value = getattr(self, var_name)
+            if var_value in imm:
+                return var_value
+
+
+
+
 
 
 
