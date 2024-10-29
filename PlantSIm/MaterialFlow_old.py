@@ -14,6 +14,9 @@ import random
 from pypdevs.simulator import Simulator
 
 from MUs import *
+#from GenerateCell import Cell
+
+
 
 
     
@@ -89,8 +92,6 @@ class Buffer(AtomicDEVS):
         self.outport = self.addOutPort(outport_name)
         self.inport = self.addInPort(inport_name)
         self.response_inport = self.addInPort(response_inport_name)
-        
-    
 
         self.do_pop = True
         self.is_full = False
@@ -221,11 +222,7 @@ class Buffer(AtomicDEVS):
                 __out.set("state","block")
                 return {self.outport: __out}
 
-class Conveyor(AtomicDEVS): 
-    #
-    #       front move
-    #
-
+class Conveyor(AtomicDEVS):
     def __init__(self, name = 'conveyor', length = 2, speed = 1.0):
         AtomicDEVS.__init__(self, name)
         self.name = name
@@ -247,29 +244,25 @@ class Conveyor(AtomicDEVS):
 
         #setting
         self.op_length = length
-        self.length = length
+        self.max_length = length
         self.speed = speed
 
     def timeAdvance(self):
         state = self.state.get()
-        print(self.name ,"ta", state, self.current_time)
+        #print("---------------------------------------------------------")
+        #print(f"TA, current_time : {self.current_time}, state : {state}, remain_time : {self.remain_time}")
 
         if state == "block":
-            return self.remain_time
+            return INFINITY
         
         elif state == "ready":
-            if self.remain_time != INFINITY:
-                self.current_time += self.remain_time
             return self.remain_time
         
         elif state == "empty":
-            if self.remain_time != INFINITY:
-                self.current_time += self.remain_time
             return self.remain_time
         
         elif state == "pop":
             self.__pop = self.conveyor.pop(0)
-            self.length += self.__pop.get("part_len")
             return 0.0
         
         else:
@@ -277,83 +270,112 @@ class Conveyor(AtomicDEVS):
                 "unknown state <%s> in <%s> time advance transition function"\
                 % (state, self.name))
         
-
-        
     def intTransition(self):
         state = self.state.get()
-        print(self.name ,"int", state)
+        if state == "ready" or state == "empty":
+            self.current_time += self.remain_time
+        #print("---------------------------------------------------------")
+        #print(f"INT, current_time : {self.current_time}, state : {state}, remain_time : {self.remain_time}")
+
+        #정보 업데이트
+        for ent in self.conveyor:
+            if ent.get("is_arrive") == False:
+                if ent.get("event_time") == self.current_time:
+                    if ent.get("possible_distance") == self.op_length:
+                        ent["moving_distance"] = self.op_length
+                        ent["is_arrive"] = True
+                        ent["is_moving"] = False
+                    else:
+                        ent["moving_distance"] = ent.get("possible_distance") 
+                        ent["is_moving"] = False
+                else:
+                    continue
+
 
         if state == "empty":
             if len(self.conveyor) == 0:
                 return self.state
 
-            #intT의 empty에 왔다는 뜻 = 첫번째 객체가 끝에 도달했다는 뜻
-            for ent in self.conveyor:
-                if ent.get("is_arrive") == False:
-                    end_ent = ent
-                    break
-            #도착 정보 표기하기
-            end_ent["is_arrive"] = True 
-            end_ent["arr_time"] = None
-
-            #바로 pop 해야하는 지 체크
-            if self.do_pop == True:
-                self.state = State_str("pop")
-                return self.state
-            
-            #아니면 ready로 상태천이
             else:
-                self.state = State_str("ready")
-                
-                #뒤에 따라오는 객체 없으면 INFINITY로 설정
-                self.remain_time = INFINITY
-                #뒤에 따라오는 객체 있으면 다음 remain_time 설정
-                for ent in self.conveyor:
-                    if ent.get("arr_time") != None:
-                        self.remain_time = ent.get("arr_time")
-                        break
-                return self.state
+                #도착했다면?
+                #print("part is arrive")
+                #print(self.conveyor[0])
+                if self.conveyor[0].get("is_arrive") == True:
+                    #바로 pop 해야하는 지 체크
+                    if self.do_pop == True:
+                        #print("do_pop immediatly")
+                        self.state = State_str("pop")
+                        return self.state
+                    
+                    #아니면 ready로 상태천이
+                    else:
+                        self.state = State_str("ready")
+
+                        for ent in self.conveyor:
+                            if ent.get("event_time") <= self.current_time:
+                                self.remain_time = INFINITY
+                                continue
+                            else:
+                                tmp = self.op_length / self.speed
+                                if tmp > (ent.get("event_time") - self.current_time):
+                                    tmp = ent.get("event_time") - self.current_time
+                                    self.remain_time = tmp
+                        #print(f"set state : ready, remain_time : {self.remain_time}")
+                        return self.state
 
         elif state == "ready":
-            #intT ready에 왔다는 뜻은 따라오던 객체가 도착 했다는 뜻
-            for ent in self.conveyor:
-                if ent.get("is_arrive") == False:
-                    end_ent = ent
-                    break
-            #도착 정보 표기하기
-            end_ent["is_arrive"] = True 
-            end_ent["arr_time"] = None
+                if self.is_full == True:
+                    self.state = State_str("block")
+                else:
+                    self.state = State_str("ready")
 
-            #뒤에 따라오는 객체 있는지 확인하기
-            for ent in self.conveyor:
-                #따라오는 객체 있을 때
-                if ent.get("arr_time") != None:
-                    self.remain_time = ent.get("arr_time")
-                    break
-                #따라오는 객체 없을 때
-                if ent == self.conveyor[-1]:
-                    self.remain_time = INFINITY
-                    if self.is_full == True:
-                        self.state = State_str("block")
 
-            return self.state          
+                for ent in self.conveyor:
+                    if ent.get("event_time") <= self.current_time:
+                        self.remain_time = INFINITY
+                        continue
+                    else:
+                        tmp = self.op_length / self.speed
+                        if tmp > (ent.get("event_time") - self.current_time):
+                            tmp = ent.get("event_time") - self.current_time
+                            self.remain_time = tmp
+                return self.state
 
         if state == "pop":
+            self.max_length += self.__pop.get("part_len")
+            plus_len = self.__pop.get("part_len")
+            for ent in self.conveyor:
+                if ent.get("is_arrive") == False:
+                    ent["possible_distance"] += plus_len
+                    if ent.get("is_moving") == False:
+                        ent["event_time"] = self.current_time + (plus_len / self.speed)
+                    else:
+                        ent["event_time"] += (plus_len / self.speed)
+
+
             if len(self.conveyor) == 0 :
                 self.remain_time = INFINITY
                 self.state = State_str("empty")
+                #print(f"set state : {self.state}, remain_time = {self.remain_time}")
                 return self.state
             
             if self.conveyor[0].get("is_arrive") == True:
-                self.remain_time = INFINITY
                 self.state = State_str("ready")
-                return self.state
             else:
                 self.state = State_str("empty")
-                self.remain_time =  self.conveyor[0].get("arr_time")
-                return self.state
-            
-            
+
+            tmp = self.op_length / self.speed
+            for ent in self.conveyor:
+                if ent.get("event_time") <= self.current_time:
+                    continue
+                else:
+                    if tmp > (ent.get("event_time") - self.current_time):
+                        tmp = ent.get("event_time") - self.current_time
+                        self.remain_time = tmp
+
+            #print(f"set state : {self.state}, remain_time = {self.remain_time}")
+            return self.state
+                        
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> internal transition function"\
@@ -361,74 +383,90 @@ class Conveyor(AtomicDEVS):
 
     def extTransition(self, inputs):
         state = self.state.get()
-        print(self.name ,"ext", self.current_time,state)
-
-        if len(self.conveyor) != 0:
-            if self.conveyor[-1].get("is_arrive") == False:
-                self.current_time -= self.remain_time
         self.current_time += self.elapsed
+        #print("---------------------------------------------------------")
+        #print(f"EXT, current_time : {self.current_time}, state : {state}")
 
         port_in = inputs.get(self.inport, None)
         response_in = inputs.get(self.response_inport, None)
 
+        #컨베이어 위에 객체 있으면 정보 업데이트
+        if len(self.conveyor) != 0 and self.elapsed != 0:
+            for ent in self.conveyor:
+                elapsed_distance = self.speed * self.elapsed
+
+                moving_distance = ent.get("moving_distance")
+                possible_distance = ent.get("possible_distance")
+
+                if possible_distance > (moving_distance + elapsed_distance):
+                    #이동거리 업데이트
+                    ent["moving_distance"] = moving_distance + elapsed_distance
+
+                else:
+                    #이동가능거리까지 이동했다는 뜻
+                    ent["moving_distance"] = possible_distance
+                    ent["is_moving"] = False
         
         # inport
         if port_in:
             if port_in.get("state") == "pop":
-                
+                #print("EXT port_in")
+
+                #들어온 객체 저장
                 part_length = port_in.get("part").get("length")
-
-                #들어왔을 때 컨베이어 위에 객체가 있을 경우
-                if len(self.conveyor) != 0:
-                    forward_ent = self.conveyor[-1]
-
-                    #끝에 도착 못한 경우
-                    if forward_ent.get("is_arrive") == False:
-                        #앞에 객체와 거리차이 계산
-                        length = self.speed * self.elapsed  - forward_ent.get("part_len")   #이동거리 - 파트길이
-                        next_time = forward_ent.get("arr_time") + length / self.speed       
-
-                    #끝에 도착 한 경우
-                    else:
-                        length = self.length
-                        next_time = length / self.speed
-
-                #들어왔을 때 컨베이어 위에 객체가 없을 경우
-                else:
-                    self.length = self.op_length
-                    length = self.op_length
-                    next_time = length / self.speed
-
                 self.conveyor.append({
-                    "incoming"  : port_in,
-                    "get_time"  : self.current_time,
-                    "arr_time"  : next_time,
-                    "part_len"  : part_length,
-                    "distance"  : length,          #distance of forward entity
-                    "is_arrive" : False
+                    "incoming"  : port_in,              #들어온 객체 저장
+                    "get_time"  : self.current_time,    #들어온 시점
+                    "part_len"  : part_length,          #파트 길이
+
+                    "moving_distance"  : 0,                                             #현재 위치(앞부분 기준)
+                    "possible_distance": self.max_length,                               #이동가능한 거리
+                    "is_arrive" : False,                                                #도착 여부
+                    "is_moving" : True,                                                 #움직이고 있는지 여부
+                    "event_time": self.current_time + (self.max_length / self.speed)    #들어오고 이동가능위치에 도착했을 때 시간
                 })
 
-                self.length - part_length
+                #print(f"current_time : {self.current_time}, event_time : {self.current_time + (self.max_length / self.speed)}")
+                self.max_length -= part_length
+                #print("max_length = ", self.max_length)
 
-                if self.length < 0:
+                if self.max_length <= 0:
                     self.is_full = True
 
-                #다음 이벤트 시간 설정
-                if self.remain_time == INFINITY:
-                    front_ent = self.conveyor[0]
-                    if front_ent.get("arr_time") == None:
-                        self.remain_time = INFINITY
-                    else:
-                        self.remain_time = front_ent.get("arr_time")
-                else:
-                    self.remain_time -= self.elapsed
 
-                return self.state              
+                #시간설정
+                for ent in self.conveyor:
+                    ev_time = ent.get("event_time")
+
+                    tmp = self.op_length / self.speed
+                    if ev_time < self.current_time:
+                        self.remain_time = INFINITY
+                        continue
+                    else:
+                        #바로 다음 이벤트 시간까지의 시간으로 설정
+                        if tmp > (ev_time - self.current_time):
+                            tmp = ev_time - self.current_time
+                        self.remain_time = tmp
+                #print(f"set state : {self.state}, remain_time = {self.remain_time}")
+                return self.state
+      
             
         if response_in:
+            for ent in self.conveyor:
+                ev_time = ent.get("event_time")
+
+                tmp = self.op_length / self.speed
+                if ev_time < self.current_time:
+                    self.remain_time = INFINITY
+                    continue
+                else:
+                    #바로 다음 이벤트 시간까지의 시간으로 설정
+                    if tmp > (ev_time - self.current_time):
+                        tmp = ev_time - self.current_time
+                    self.remain_time = tmp
+
             if response_in.get("state") == "pop":
-                if self.remain_time != INFINITY:
-                    self.remain_time -= self.elapsed
+                #print("response_in : block해제 ")
                 
                 #Save this response
                 self.do_pop = True
@@ -436,48 +474,68 @@ class Conveyor(AtomicDEVS):
 
                 #If Buffer Can't pop entry
                 if state == "empty":
+                    #print("not ready")
                     self.state = State_str("empty")
+                    #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                     return self.state
                 
                 #Buffer can pop entry
                 else:
                     #Set state "pop"
+                    #print("do pop")
                     self.state = State_str("pop")
                     #Release do_pop
                     self.do_pop = False
+                    #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                     return self.state
                 
             elif response_in.get("state") == "block":
-                if self.remain_time != INFINITY:
-                    self.remain_time -= self.elapsed
+                #print("next ent was blocked")
                 self.do_pop = False
+                #print(f"set state : {self.state}, remain_time : {self.remain_time}")
                 return self.state
                 
-        if self.remain_time != INFINITY:
-            self.remain_time -= self.elapsed
+        for ent in self.conveyor:
+            ev_time = ent.get("event_time")
+
+            tmp = self.op_length / self.speed
+            if ev_time < self.current_time:
+                self.remain_time = INFINITY
+                continue
+            else:
+                #바로 다음 이벤트 시간까지의 시간으로 설정
+                if tmp > (ev_time - self.current_time):
+                    tmp = ev_time - self.current_time
+                self.remain_time = tmp
+        #print(f"set state : {self.state}, remain_time : {self.remain_time}")
         return self.state
             
     def outputFnc(self):
         state = self.state.get()
+        #print("---------------------------------------------------------")
+        #print(f"OUT, current_time = {self.current_time}, state : {state}")
         
-        #print(state)
+        ##print(state)
         __out = Out()
 
         if state == "pop":
             if self.is_full == False:
+                #print("doing pop")
                 __out = self.__pop.get("incoming")
                 __out.set("state",state)
                 
                 elased_time = self.current_time - self.__pop.get("get_time")
                 __out.set(self.name,elased_time)
-                #print("out")
+                ##print("out")
                 return {self.outport: __out}
             else:
+                #print("block signal")
                 __out.set("state","block")
                 return {self.outport: __out}
             
         if state == "ready":
             if self.is_full == True:
+                #print("block signal")
                 __out.set("state","block")
                 __out.set("msg", "conveyor is full")
                 return {self.outport: __out}
@@ -486,13 +544,21 @@ class Conveyor(AtomicDEVS):
                 return {self.outport: __out}
             
         if state == "empty":
-            __out.set("state","empty")
+            #print("not ready")
+            if self.is_full:
+                __out.set("state","block")
+            else:
+                __out.set("state","empty")
             return {self.outport: __out}
 
-        
-        
+
+   
 class Station(AtomicDEVS):
-    def __init__(self, name = 'station', working_time = 10):
+    '''
+    working_time = [mu,sigma,lower,upper]
+    if sigma = 0 , than working_time will set const mu
+    '''
+    def __init__(self, name = 'station', working_time = [10,0,0,0]):
         AtomicDEVS.__init__(self, name)
         self.name = name
         self.state = State_str("ready")
@@ -511,13 +577,30 @@ class Station(AtomicDEVS):
         self.is_in = False
 
         #setting
-        self.working_time = working_time
+        self.working_time_setting = working_time
         self.remain_time = 0
 
+    def generate_normal(self,setting):
+        import scipy.stats as stats
+        mu = setting[0]
+        sigma = setting[1]
+        lower = setting[2]
+        upper = setting[3]
+
+        if sigma == 0:
+            return mu
+        
+        low = (lower - mu) / sigma
+        upp = (upper - mu) / sigma
+        
+        #make randnum
+        samples = stats.truncnorm.rvs(low, upp, loc=mu, scale=sigma, size=1)
+        working_time = int(samples[0])
+        return working_time
 
     def timeAdvance(self):
         state = self.state.get()
-        #print(self.name, self.current_time,"TA",state)
+        ##print(self.name, self.current_time,"TA",state)
 
         if state == "ready":
             return INFINITY
@@ -534,14 +617,13 @@ class Station(AtomicDEVS):
     def intTransition(self):
         state = self.state.get()
         
-        
-        #print(self.name,self.current_time,"int")
+        ##print(self.name,self.current_time,"int")
 
         if state == "busy":
             if self.is_first_pulse == True:
                 self.is_first_pulse = False
                 self.is_in = True
-                self.remain_time = self.working_time
+                self.remain_time = self.generate_normal(self.working_time_setting)
                 self.state = State_str("busy")
                 return self.state
             else:
@@ -561,7 +643,7 @@ class Station(AtomicDEVS):
         if self.is_in == True and self.next_is_blocked == False:
             self.current_time -= self.remain_time
         self.current_time += self.elapsed
-        #print(self.name, self.current_time, "ext")
+        ##print(self.name, self.current_time, "ext")
         
         incoming = inputs.get(self.inport, None)
         response = inputs.get(self.response_inport, None)
@@ -623,8 +705,8 @@ class Station(AtomicDEVS):
                     return {self.outport: __out}
                 
                 else:
-                    #print(self.name, self.current_time, "out")
-                    #print(self.name, " out")
+                    ##print(self.name, self.current_time, "out")
+                    ##print(self.name, " out")
                     __out = self.__product.get("incoming")
                     __out.set("state","pop")
                     
@@ -642,7 +724,8 @@ class Drain(AtomicDEVS):
         self.inport = self.addInPort(inport_name)
         self.count = 0
         self.result = []
-    
+
+        
 
     def timeAdvance(self):
         state = self.state.get()
@@ -662,86 +745,137 @@ class Drain(AtomicDEVS):
         if port_in.get("state") == "pop":
             self.count += 1
             self.result.append(port_in)
+            #print(f"total : {self.count}")
             self.state = State_arr(["get", self.count])
             return self.state
         else:
             self.state = State_arr(["get", self.count])
             return self.state
-        
+    
+    
 
+class Seperator(AtomicDEVS):
+    def __init__(self, name = 'seperator', out_way = 3):
+        AtomicDEVS.__init__(self, name)
+        self.name = name
+        self.state = State_str("ready")
+        self.out_way = out_way
+        self.num = 0
 
-# class Conveyor
+        __out = Out()
+        __out.set("state","ready")
+        self.incoming = __out
 
-inputData = {
-    "name"  :["source","source_buffer", "station_1",    "conveyor_1",   "station_2",    "result"],
-    "type"  :["Source", "Buffer",       "Station",      "Conveyor",     "Station",      "Drain"],
-    "time"  :[2,        None,           2,              2,              10,             None]
-}
+        inport_name = name + '_inport'
+        self.inport = self.addInPort(inport_name)
 
-
-class LinearLine(CoupledDEVS):
-    def __init__(self, name="LinearLine", inputData= {}):
-        CoupledDEVS.__init__(self, name)
-        self.variable_name = []
-        self.variable_type = []
-        for i in range(len(inputData["name"])):
-            name = inputData["name"][i]
-            type = inputData["type"][i]
-            time = inputData["time"][i]
-            if type == "Source":
-                setattr(self,name,self.addSubModel(Source(name=name, interval=time)))
+        for num in range(out_way):
+            outport_name = name + "_outport_" + str(num)
+            val_name = "outport_" + str(num)
+            setattr(self, val_name, self.addOutPort(outport_name))
             
-            elif type == "Buffer":
-                if time == None:
-                    setattr(self,name,self.addSubModel(Buffer(name=name)))
-                else:
-                    setattr(self,name,self.addSubModel(Buffer(name=name, capacity= time)))
+    def timeAdvance(self):
+        state = self.state.get()
 
-            elif type == "Conveyor":
-                setattr(self,name,self.addSubModel(Conveyor(name=name,length=time)))
-
-            elif type == "Station":
-                setattr(self,name,self.addSubModel(Station(name=name,working_time=time)))
-
-            else:
-                setattr(self,name,self.addSubModel(Drain(name=name)))
-            self.variable_name.append(name)
-            self.variable_type.append(type)
-
-        print(self.variable_name)
-        print(self.variable_type)
-
-        for i in range(len(self.variable_name)-1):
-            val_now = getattr(self, self.variable_name[i])
-            val_next = getattr(self, self.variable_name[i+1])
-            val_outport = val_now.outport
-            val_inport = val_next.inport
-            self.connectPorts(val_outport,val_inport)
-
-            now_type = self.variable_type[i]
-            next_type = self.variable_type[i+1]
+        if state == "ready":
+            return INFINITY
+        elif state == "pop":
+            return 0.0
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> time advance transition function"\
+                % (state, self.name))
         
-            if now_type == "Station" or now_type == "Buffer" or now_type == "Conveyor" :
-                if next_type == "Station" or next_type == "Buffer" or next_type == "Conveyor":
-                    val_response_outport = val_next.outport
-                    val_response_inport = val_now.response_inport
-                    self.connectPorts(val_response_outport, val_response_inport)
+    def intTransition(self):
+        state = self.state.get()
+        
+        ##print(self.name,self.current_time,"int")
+
+        if state == "pop":
+            self.state = State_str("ready")
+
+            return self.state
+            
+        else:
+            raise DEVSException(\
+                "unknown state <%s> in <%s> internal transition function"\
+                % (state, self.name))
+    
+    def extTransition(self, inputs):
+        port_in =inputs[self.inport]
+
+        self.incoming = port_in
+        if self.incoming.get("state") == "pop":
+            self.state = State_str("pop")
+        else:
+            self.state = State_str("ready")
+
+        return self.state
+    
+    def outputFnc(self):
+
+        for out_num in range(self.out_way):
+            if self.num == out_num:
+                _outport_name = "outport_"+str(self.num)
+                outport_value = getattr(self, _outport_name)
+                self.incoming.set("seperator",_outport_name)
+                if self.num < self.out_way-1:
+                    self.num += 1
+                else:
+                    self.num = 0
+                return {outport_value: self.incoming}
+
+'''
+class Test(CoupledDEVS):
+    def __init__(self, name):
+        CoupledDEVS.__init__(self, name)
+
+        self.source = self.addSubModel(Source(name="source",interval=2))
+        self.buffer = self.addSubModel(Buffer(name="buffer"))
+
+        self.station_first = self.addSubModel(Station(name="station_first"))
+
+        self.cell = self.addSubModel(Cell(name="cell"))
+        #self.line0 = self.addSubModel(Line_in_Cell(name="LinC0"))
+
+        self.station_last = self.addSubModel(Station(name="station_last"))
+        self.result = self.addSubModel(Drain(name="result"))
+
+        self.connectPorts(self.source.outport, self.buffer.inport)
+        self.connectPorts(self.buffer.outport, self.station_first.inport)
+        self.connectPorts(self.station_first.outport, self.cell.inport)
+        self.connectPorts(self.cell.outport, self.station_last.inport)
+        self.connectPorts(self.station_last.outport, self.result.inport)
+
+        self.connectPorts(self.station_last.outport, self.cell.response_inport)
+        self.connectPorts(self.station_first.outport, self.buffer.response_inport)
 
     def select(self, imm):
-        for var_name in reversed(self.variable_name):
-            var_value = getattr(self, var_name)
-            if var_value in imm:
-                return var_value
-        
+        if self.result in imm:
+            return self.result
+        elif self.station_last in imm:
+            return self.station_last
+        elif self.cell in imm:
+            return self.cell
+        elif self.station_first in imm:
+            return self.station_first
+        elif self.buffer in imm:
+            return self.buffer
+        elif self.source in imm:
+            return self.source
 
+#setting
+sim = Simulator(Test("Test"))
 
+sim.setVerbose()
+sim.setTerminationTime(100)
 
-
-
-sim = Simulator(LinearLine("LinearLine",inputData=inputData))
-
-#sim.setVerbose()
-sim.setTerminationTime(60)
 sim.setClassicDEVS()
 
 sim.simulate()
+
+        '''
+
+
+        
+

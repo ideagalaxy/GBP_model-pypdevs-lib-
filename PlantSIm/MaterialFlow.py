@@ -222,11 +222,7 @@ class Buffer(AtomicDEVS):
                 __out.set("state","block")
                 return {self.outport: __out}
 
-class Conveyor(AtomicDEVS): 
-    #
-    #       front move
-    #
-
+class Conveyor(AtomicDEVS):
     def __init__(self, name = 'conveyor', length = 2, speed = 1.0):
         AtomicDEVS.__init__(self, name)
         self.name = name
@@ -388,8 +384,7 @@ class Conveyor(AtomicDEVS):
     def extTransition(self, inputs):
         state = self.state.get()
         self.current_time += self.elapsed
-        #print("---------------------------------------------------------")
-        #print(f"EXT, current_time : {self.current_time}, state : {state}")
+        
 
         port_in = inputs.get(self.inport, None)
         response_in = inputs.get(self.response_inport, None)
