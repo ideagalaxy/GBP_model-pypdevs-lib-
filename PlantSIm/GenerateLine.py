@@ -40,13 +40,19 @@ class Data_preprocessing:
         el_param = []
 
         return el_param
+    
+    def getModel(self,input):
+        model = Gen_LINE(input)
+        return model
 
+    def simulate(model, time = 100, setVerbose = True):
+        sim = Simulator(model)
+        if setVerbose == True:
+            sim.setVerbose()
+        sim.setTerminationTime(time)
+        sim.setClassicDEVS()
 
-
-
-        
-
-
+        sim.simulate()
 
 
 class Gen_LINE(CoupledDEVS):
