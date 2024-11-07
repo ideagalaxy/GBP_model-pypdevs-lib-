@@ -1,6 +1,5 @@
 from pypdevs.DEVS import *
 from pypdevs.infinity import INFINITY
-import random
 
 
 from MUs import *
@@ -42,10 +41,30 @@ class Tasks_Cell(CoupledDEVS):
             if var_value in imm:
                 return var_value
 
+def is_odd(number): #홀수확인
+    if number % 2 == 0:
+        return False
+    else:
+        return True
+
+def parrallel_generate_odd(number, include_one = False): #홀수 생성기
+    odd = []
+    loop = int(number / 2)
+    for i in range(loop+1):
+        tmp = 1 + i*2
+        if include_one == False:
+            if tmp == 1:
+                continue
+        odd.append(tmp*2)
+        odd.append(tmp*2)
+    return odd
+
 class Parallel_Cell(CoupledDEVS):
     def __init__(self, name="Parallel_Cell", line_num = 2, task_num = 3, cycle_time = 6):
         CoupledDEVS.__init__(self, name)
 
+        if line_num < 2:
+            raise ValueError("2개 이상부터 Cell 제작 가능")
 
         self.seperator = self.addSubModel(Seperator(name="seperator",out_way=line_num))
         self.buffer = self.addSubModel(Buffer(name="buffer"))
@@ -61,29 +80,71 @@ class Parallel_Cell(CoupledDEVS):
         tmp2 = []
         tmp3 = []
 
-        for line in range(line_num):
-            conveyor_in_name = "line"+str(line+1)+"_conveyor_in"
-            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=2)))
+        if is_odd(line_num):
+            print("line : ", 0)
+            length = 2
+
+            conveyor_in_name = "line0_conveyor_in"
+            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=length)))
             tmp1.append(conveyor_in_name)
-            
-            task_name = "line"+str(line+1)+"_station"
+            print(f"{self.name} : {conveyor_in_name} : setting {length} m")
+
+            task_name = "line0_task"
             setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, task_num=task_num, param=cycle_time)))
             tmp2.append(task_name)
+            print(f"{self.name} : {task_name} : setting {cycle_time} sec")
 
-            conveyor_out_name = "line"+str(line+1)+"_conveyor_out"
-            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=2)))
+            conveyor_out_name = "line0_conveyor_out"
+            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=length)))
             tmp3.append(conveyor_out_name)
+            print(f"{self.name} : {conveyor_out_name} : setting {length} m")
 
             conv_in = getattr(self, conveyor_in_name)
             task = getattr(self, task_name)   
             conv_out = getattr(self, conveyor_out_name)
 
-            self.connectPorts(self.seperator.outport, conv_in.inport)
+            self.connectPorts(self.seperator.outport_0, conv_in.inport)
             self.connectPorts(conv_in.outport, task.inport)
             self.connectPorts(task.response_outport, conv_in.response_inport)
             self.connectPorts(task.outport, conv_out.inport)
             self.connectPorts(conv_out.outport, self.buffer.inport)
         
+        conv_lengths = parrallel_generate_odd(line_num)
+        i=0
+        for line in range(line_num):
+            if is_odd(line_num):
+                if line == 0:
+                    continue
+            print("line : ",line)
+            
+            conveyor_in_name = "line"+str(line)+"_conveyor_in"
+            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=conv_lengths[i])))
+            tmp1.append(conveyor_in_name)
+            print(f"{self.name} : {conveyor_in_name} : setting {conv_lengths[i]} m")
+            
+            task_name = "line"+str(line)+"_task"
+            setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, task_num=task_num, param=cycle_time)))
+            tmp2.append(task_name)
+            print(f"{self.name} : line{line}_station X {line_num} : setting {cycle_time} sec")
+
+            conveyor_out_name = "line"+str(line)+"_conveyor_out"
+            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=conv_lengths[i])))
+            tmp3.append(conveyor_out_name)
+            print(f"{self.name} : {conveyor_out_name}: setting {conv_lengths[i]} m")
+
+            conv_in = getattr(self, conveyor_in_name)
+            task = getattr(self, task_name)   
+            conv_out = getattr(self, conveyor_out_name)
+
+            outport_num = "outport_"+str(line)
+            seperator_outport = getattr(self.seperator, outport_num)
+            self.connectPorts(seperator_outport, conv_in.inport)
+            self.connectPorts(conv_in.outport, task.inport)
+            self.connectPorts(task.response_outport, conv_in.response_inport)
+            self.connectPorts(task.outport, conv_out.inport)
+            self.connectPorts(conv_out.outport, self.buffer.inport)
+
+            i += 1
         tmp3.append("buffer")
 
         self.variable = tmp1 + tmp2 + tmp3
@@ -93,7 +154,6 @@ class Parallel_Cell(CoupledDEVS):
             var_value = getattr(self, var_name)
             if var_value in imm:
                 return var_value 
-
 
 class Block_Cell(CoupledDEVS):
     def __init__(self, name="Block_Cell", line_num = 3 , task_num = 2, cycle_time = 1):

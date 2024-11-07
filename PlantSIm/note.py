@@ -71,14 +71,15 @@ class Conveyor(AtomicDEVS):
             self.conveyor[0]["is_arrive"] = True
 
             if self.do_pop == True:
-                self.state = State_arr(["pop",next_time])
+                self.state = State_arr(["pop",self.current_time])
             else:
                 if self.is_full == True:
-                    self.state = State_arr("block",next_time)
+                    self.state = State_arr("block",INFINITY)
                 else:
-                    self.state = State_arr("ready",next_time)
+                    self.state = State_arr("ready",INFINITY)
 
         if state == "pop":
+            #정보 업데이트
             self.max_length += self.__pop.get("part_len")
             plus_time = self.__pop.get("part_len") / self.speed
 
@@ -86,12 +87,19 @@ class Conveyor(AtomicDEVS):
                 self.state = State_arr(["empty",INFINITY])
                 return self.state
             else:
-                first = self.conveyor[0]
-                self.remain_time
+                first = True
+                for item in self.conveyor: #이미 pop은 되어 있는 상태
+                    if item["event_time"] > self.current_time:
+                        item["event_time"] += plus_time
+                    else:
+                        item["event_time"] = self.current_time + plus_time
+
+                    if first == True:
+                        next_time = item["event_time"]
+                        first = False
 
                 self.state = State_arr(["empty",next_time])
-
-
+                return self.state
 
     def extTransition(self, inputs):
         state_arr = self.state.get()
@@ -147,6 +155,30 @@ class Conveyor(AtomicDEVS):
                 self.do_pop = False
 
         return self.state
+    
+    def outputFnc(self):
+        state_arr = self.state.get()
+        state = state_arr[0]
+        next_time =state_arr[1]
+
+        __out = Out()
+        if state == "pop":
+            __out = self.__pop.get("incoming")
+            __out.set("state",state)
+            elased_time = self.current_time - self.__pop.get("get_time")
+            __out.set(self.name,elased_time)
+
+            return {self.outport: __out}
+        
+        if state == "empty":
+            if self.do_pop == False:
+                if self.is_full:
+                    __out.set("state","block")
+                else:
+                    __out.set("state","empty")
+            return {self.outport: __out}
+
+
 
 
     def get_next_event_time(self,conveyor):
