@@ -68,6 +68,7 @@ class Parallel_Cell(CoupledDEVS):
 
         self.seperator = self.addSubModel(Seperator(name="seperator",out_way=line_num))
         self.buffer = self.addSubModel(Buffer(name="buffer"))
+
         self.inport = self.addInPort(name="Parallel_Cell_in")
         self.outport = self.addOutPort(name="Parallel_Cell_out")
         self.response_inport = self.addInPort(name="Parallel_Cell_response_inport")
@@ -87,17 +88,19 @@ class Parallel_Cell(CoupledDEVS):
             conveyor_in_name = "line0_conveyor_in"
             setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=length)))
             tmp1.append(conveyor_in_name)
-            print(f"{self.name} : {conveyor_in_name} : setting {length} m")
+            #print(f"{self.name} : {conveyor_in_name} : setting {length} m")
 
             task_name = "line0_task"
             setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, task_num=task_num, param=cycle_time)))
             tmp2.append(task_name)
-            print(f"{self.name} : {task_name} : setting {cycle_time} sec")
+            #print(f"{self.name} : {task_name} : setting {cycle_time} sec")
 
             conveyor_out_name = "line0_conveyor_out"
             setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=length)))
             tmp3.append(conveyor_out_name)
-            print(f"{self.name} : {conveyor_out_name} : setting {length} m")
+            #print(f"{self.name} : {conveyor_out_name} : setting {length} m")
+
+            print(f"{self.name} : conveyor_in : {length}m | task X {task_num} | conveyor_out : {length}m")
 
             conv_in = getattr(self, conveyor_in_name)
             task = getattr(self, task_name)   
@@ -120,17 +123,19 @@ class Parallel_Cell(CoupledDEVS):
             conveyor_in_name = "line"+str(line)+"_conveyor_in"
             setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=conv_lengths[i])))
             tmp1.append(conveyor_in_name)
-            print(f"{self.name} : {conveyor_in_name} : setting {conv_lengths[i]} m")
+            #print(f"{self.name} : {conveyor_in_name} : setting {conv_lengths[i]} m")
             
             task_name = "line"+str(line)+"_task"
             setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, task_num=task_num, param=cycle_time)))
             tmp2.append(task_name)
-            print(f"{self.name} : line{line}_station X {line_num} : setting {cycle_time} sec")
+            #print(f"{self.name} : line{line}_station X {task_num} : setting {cycle_time} sec")
 
             conveyor_out_name = "line"+str(line)+"_conveyor_out"
             setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=conv_lengths[i])))
             tmp3.append(conveyor_out_name)
-            print(f"{self.name} : {conveyor_out_name}: setting {conv_lengths[i]} m")
+            #print(f"{self.name} : {conveyor_out_name}: setting {conv_lengths[i]} m")
+
+            print(f"{self.name} : conveyor_in : {conv_lengths[i]}m | task X {task_num} | conveyor_out : {conv_lengths[i]}m")
 
             conv_in = getattr(self, conveyor_in_name)
             task = getattr(self, task_name)   
@@ -155,6 +160,15 @@ class Parallel_Cell(CoupledDEVS):
             if var_value in imm:
                 return var_value 
 
+
+def block_generate_odd(number): #홀수 생성기
+    odd = []
+    for i in range(number):
+        tmp = 1 + i*2
+        odd.append(tmp*2)
+    return odd
+
+
 class Block_Cell(CoupledDEVS):
     def __init__(self, name="Block_Cell", line_num = 3 , task_num = 2, cycle_time = 1):
         CoupledDEVS.__init__(self, name)
@@ -173,18 +187,27 @@ class Block_Cell(CoupledDEVS):
         tmp2 = []
         tmp3 = []
         
+        conv_lengths = block_generate_odd(line_num)
+        
+        last = len(conv_lengths) - 1
         for line in range(line_num):
+            print("line : ",line)
             conveyor_in_name = "line"+str(line)+"_conveyor_in"
-            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length = 2*(1+2*line) )))
+            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=conv_lengths[line])))
             tmp1.append(conveyor_in_name)
-
-            task_name = "line"+str(line)+"_station"
+            #print(f"{self.name} : {conveyor_in_name} : setting {conv_lengths[line]} m")
+            
+            task_name = "line"+str(line)+"_task"
             setattr(self,task_name,self.addSubModel(Tasks_Cell(name=task_name, task_num=task_num, param=cycle_time)))
             tmp2.append(task_name)
-            
+            #print(f"{self.name} : line{line}_station X {task_num} : setting {cycle_time} sec")
+
             conveyor_out_name = "line"+str(line)+"_conveyor_out"
-            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length = 2*(1+2*(line_num-line-1)) )))
+            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=conv_lengths[last - line])))
             tmp3.append(conveyor_out_name)
+            #print(f"{self.name} : {conveyor_out_name}: setting {conv_lengths[last - line]} m")
+
+            print(f"{self.name} : conveyor_in : {conv_lengths[line]}m | task X {task_num} | conveyor_out : {conv_lengths[last - line]}m")
 
             conv_in = getattr(self, conveyor_in_name)
             task = getattr(self, task_name)   
@@ -206,49 +229,5 @@ class Block_Cell(CoupledDEVS):
         for var_name in reversed(self.variable):
             var_value = getattr(self, var_name)
             if var_value in imm:
-                return var_value
-
-'''
-
-class Cell(CoupledDEVS):
-    def __init__(self, name="cell"):
-        CoupledDEVS.__init__(self, name)
-
-        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=3))
-
-        self.line0 = self.addSubModel(Tasks_Cell(name="line0", param=4))
-        self.line1 = self.addSubModel(Tasks_Cell(name="line1", param=4))
-        self.line2 = self.addSubModel(Tasks_Cell(name="line2", param=4))
-
-        self.buffer = self.addSubModel(Buffer(name="buffer"))
-
-        self.inport = self.addInPort(name="Cell_in")
-        self.outport = self.addOutPort(name="Cell_out")
-        self.response_inport = self.addInPort(name="Cell_response_inport")
-
-        self.connectPorts(self.inport, self.seperator.inport)
-
-        self.connectPorts(self.seperator.outport_0, self.line0.inport)
-        self.connectPorts(self.seperator.outport_1, self.line1.inport)
-        self.connectPorts(self.seperator.outport_2, self.line2.inport)
-
-        self.connectPorts(self.line0.outport, self.buffer.inport)
-        self.connectPorts(self.line1.outport, self.buffer.inport)
-        self.connectPorts(self.line2.outport, self.buffer.inport)
-
-        self.connectPorts(self.response_inport, self.buffer.response_inport)
-        self.connectPorts(self.buffer.outport, self.outport)
-
-    def select(self, imm):
-        if self.buffer in imm:
-            return self.buffer
-        elif self.line2 in imm:
-            return self.line2
-        elif self.line1 in imm:
-            return self.line1
-        elif self.line0 in imm:
-            return self.line0
-        elif self.seperator in imm:
-            return self.seperator
-            
-'''
+                return var_value 
+        

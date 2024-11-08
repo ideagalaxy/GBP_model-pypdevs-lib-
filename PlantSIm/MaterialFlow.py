@@ -259,12 +259,13 @@ class Conveyor(AtomicDEVS):
         
         elif state == "empty":
             if len(self.conveyor) == 0:
-                self.remain_time == INFINITY
+                self.remain_time = INFINITY
+                return self.remain_time
             else:
                 first = self.conveyor[0]
                 self.remain_time = first["event_time"] - self.current_time
-
-            return self.remain_time
+                return self.remain_time
+            
         
         elif state == "pop":
             self.__pop = self.conveyor.pop(0)
@@ -286,7 +287,10 @@ class Conveyor(AtomicDEVS):
             self.current_time += self.remain_time
 
             if self.do_pop == True:
-                self.state = State_arr(["pop",self.current_time])
+                if len(self.conveyor) > 0:
+                    self.state = State_arr(["pop",self.current_time])
+                else:
+                    self.state = State_arr(["empty",INFINITY])
             else:
                 if self.is_full == True:
                     self.state = State_arr(["block",INFINITY])
@@ -329,7 +333,7 @@ class Conveyor(AtomicDEVS):
         response_in = inputs.get(self.response_inport, None)
 
         if port_in:
-            if state != "block":
+            if self.is_full == False:
                 #empty나 ready일때만 append 진행
                 if port_in.get("state") == "pop":
                     #part 들어올 때
