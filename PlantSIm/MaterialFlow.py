@@ -173,7 +173,7 @@ class Buffer(AtomicDEVS):
                     if self.capacity <= self.inventory.len():
                         if self.capacity != -1:
                             self.is_full = True
-                            self.state = State_str("pop")
+                            self.state = State_str("pop") #block된 신호를 내보내기 위해 pop 거침
                             return self.state
                         else:
                             self.state = State_str("ready")
