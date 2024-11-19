@@ -24,6 +24,7 @@ class DEVS:
 
         station_num = 1
         cell_num = 1
+        conv_num = 1
         
         for type in el_type:
             
@@ -34,6 +35,10 @@ class DEVS:
             elif type == "Station":
                 _name = "Station_" + str(station_num)
                 station_num += 1
+                el_name.append(_name)
+            elif type == "Conveyor":
+                _name = "Conveyor" + str(conv_num)
+                conv_num += 1
                 el_name.append(_name)
             else:
                 el_name.append(type)
@@ -124,6 +129,7 @@ class Gen_LINE(CoupledDEVS):
                 setattr(self,name,self.addSubModel(Buffer(name=name, capacity=param["capacity"])))
 
             elif type == "Conveyor":
+                
                 setattr(self,name,self.addSubModel(Conveyor(name=name,length=param["length"],speed=param["speed"])))
 
             elif type == "Block Cell":
@@ -152,6 +158,8 @@ class Gen_LINE(CoupledDEVS):
             next_type = self.variable_type[i+1]
 
             if now_type == "Source" or now_type == "Drain":
+                continue
+            if next_type == "Parallel Cell" or next_type == "Block Cell":
                 continue
             val_response_outport = val_next.outport
             val_response_inport = val_now.response_inport

@@ -51,7 +51,7 @@ def parrallel_generate_odd(number, include_one = False): #홀수 생성기
     odd = []
     loop = int(number / 2)
     for i in range(loop+1):
-        tmp = 1 + i*2
+        tmp = 1 + i
         if include_one == False:
             if tmp == 1:
                 continue
@@ -164,7 +164,7 @@ class Parallel_Cell(CoupledDEVS):
 def block_generate_odd(number): #홀수 생성기
     odd = []
     for i in range(number):
-        tmp = 1 + i*2
+        tmp = i+1
         odd.append(tmp*2)
     return odd
 

@@ -74,6 +74,7 @@ class Source(AtomicDEVS):               #Source will create 'Part' object
 
             self.count += 1
             name = "part_" + str(self.count)
+            __out.set("part_name",name)
             part = Part(name, self.part_lwh[0], self.part_lwh[1], self.part_lwh[2])
             __out.set("part",part)
             
@@ -228,6 +229,8 @@ class Conveyor(AtomicDEVS):
         self.name = name
         self.state = State_arr(["empty",INFINITY])
         self.current_time = 0.0
+
+        print(f"{self.name} : set length={length}, set speed={speed}")
 
         outport_name = name + '_outport'
         inport_name = name + '_inport'
@@ -606,6 +609,7 @@ class Drain(AtomicDEVS):
 
         if port_in.get("state") == "pop":
             self.count += 1
+            print("Total : ", self.count)
             self.result.append(port_in)
             self.state = State_arr(["get", self.count])
             self.time = 0

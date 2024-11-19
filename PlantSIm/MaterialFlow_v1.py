@@ -741,11 +741,13 @@ class Drain(AtomicDEVS):
         state = self.state.get()
 
         port_in =inputs[self.inport]
+        
 
         if port_in.get("state") == "pop":
             self.count += 1
+            print(f"total : {self.count}")
             self.result.append(port_in)
-            #print(f"total : {self.count}")
+            
             self.state = State_arr(["get", self.count])
             return self.state
         else:
