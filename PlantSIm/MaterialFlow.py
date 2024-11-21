@@ -226,8 +226,9 @@ class Buffer(AtomicDEVS):
 class Conveyor(AtomicDEVS):
     def __init__(self, name = 'conveyor', length = 2, speed = 1.0):
         AtomicDEVS.__init__(self, name)
+        self.conveyor = []
         self.name = name
-        self.state = State_arr(["empty",INFINITY])
+        self.state = State_arr(["empty",INFINITY,len(self.conveyor)])
         self.current_time = 0.0
 
         print(f"{self.name} : set length={length}, set speed={speed}")
@@ -241,7 +242,7 @@ class Conveyor(AtomicDEVS):
         self.response_inport = self.addInPort(response_inport_name)
 
         self.remain_time = INFINITY
-        self.conveyor = []
+        
         self.is_full = False
         self.do_pop = True
 
@@ -291,14 +292,14 @@ class Conveyor(AtomicDEVS):
 
             if self.do_pop == True:
                 if len(self.conveyor) > 0:
-                    self.state = State_arr(["pop",self.current_time])
+                    self.state = State_arr(["pop",self.current_time,len(self.conveyor)])
                 else:
-                    self.state = State_arr(["empty",INFINITY])
+                    self.state = State_arr(["empty",INFINITY,len(self.conveyor)])
             else:
                 if self.is_full == True:
-                    self.state = State_arr(["block",INFINITY])
+                    self.state = State_arr(["block",INFINITY,len(self.conveyor)])
                 else:
-                    self.state = State_arr(["ready",INFINITY])
+                    self.state = State_arr(["ready",INFINITY,len(self.conveyor)])
             
             return self.state
 
@@ -308,7 +309,7 @@ class Conveyor(AtomicDEVS):
             plus_time = self.__pop.get("part_len") / self.speed
 
             if len(self.conveyor) == 0:
-                self.state = State_arr(["empty",INFINITY])
+                self.state = State_arr(["empty",INFINITY,len(self.conveyor)])
                 return self.state
             
             else:
@@ -323,7 +324,7 @@ class Conveyor(AtomicDEVS):
                         next_time = item["event_time"]
                         first = False
 
-                self.state = State_arr(["empty",next_time])
+                self.state = State_arr(["empty",next_time,len(self.conveyor)])
                 return self.state
 
     def extTransition(self, inputs):
@@ -350,17 +351,19 @@ class Conveyor(AtomicDEVS):
                     })
 
                     self.max_length -= part_length
-                    if self.max_length <= 0:
+                    if self.max_length < 0:
                         self.is_full = True
 
                     #처음 들어오거나 아직 도착 안했을때
                     if state == "empty":
                         next_time = self.conveyor[0]["event_time"]
-                        self.state = State_arr(["empty",next_time])
+                        self.state = State_arr(["empty",next_time,len(self.conveyor)])
                         return self.state
                     
                     #끝에 도착한게 있을 때
                     elif state == "ready":
+                        state_arr[2] = len(self.conveyor)
+                        self.state = State_arr(state_arr)
                         return self.state
 
         if response_in:
@@ -369,15 +372,17 @@ class Conveyor(AtomicDEVS):
                 self.is_full = False
 
                 if state == "empty":
-                    self.state = State_arr(["empty",next_time])
+                    self.state = State_arr(["empty",next_time,len(self.conveyor)])
                     return self.state
                 else:
-                    self.state = State_arr(["pop",next_time])
+                    self.state = State_arr(["pop",next_time,len(self.conveyor)])
                     return self.state
     
             elif response_in.get("state") == "block":
                 self.do_pop = False
 
+        state_arr[2] = len(self.conveyor)
+        self.state = State_arr(state_arr)
         return self.state
     
     def outputFnc(self):
