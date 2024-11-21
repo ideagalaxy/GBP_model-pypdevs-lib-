@@ -157,6 +157,8 @@ class Gen_LINE(CoupledDEVS):
             now_type = self.variable_type[i]
             next_type = self.variable_type[i+1]
 
+            print(f"{self.variable_name[i]} outport -> {self.variable_name[i+1]} inport")
+
             if now_type == "Source" or now_type == "Drain":
                 continue
             if next_type == "Parallel Cell" or next_type == "Block Cell":
@@ -164,6 +166,8 @@ class Gen_LINE(CoupledDEVS):
             val_response_outport = val_next.outport
             val_response_inport = val_now.response_inport
             self.connectPorts(val_response_outport, val_response_inport)
+
+            print(f"{self.variable_name[i+1]} outport -> {self.variable_name[i]} response_inport")
 
     def select(self, imm):
         for var_name in reversed(self.variable_name):
