@@ -71,6 +71,7 @@ class Source(AtomicDEVS):               #Source will create 'Part' object
         if state == "pop":
             __out = Out()
             __out.set("state","pop")
+            __out.set("sender", self.name)
 
             self.count += 1
             name = "part_" + str(self.count)
@@ -214,6 +215,7 @@ class Buffer(AtomicDEVS):
             if self.is_full == False:
                 __out = self.__pop.get("incoming")
                 __out.set("state",state)
+                __out.set("sender", self.name)
                 
                 elased_time = self.current_time - self.__pop.get("get_time")
                 __out.set(self.name,elased_time)
@@ -221,6 +223,7 @@ class Buffer(AtomicDEVS):
                 return {self.outport: __out}
             else:
                 __out.set("state","block")
+                __out.set("sender", self.name)
                 return {self.outport: __out}
 
 class Conveyor(AtomicDEVS):
@@ -394,6 +397,7 @@ class Conveyor(AtomicDEVS):
         if state == "pop":
             __out = self.__pop.get("incoming")
             __out.set("state",state)
+            __out.set("sender", self.name)
             elased_time = self.current_time - self.__pop.get("get_time")
             __out.set(self.name,elased_time)
 
@@ -403,12 +407,15 @@ class Conveyor(AtomicDEVS):
             if self.do_pop == False:
                 if self.is_full:
                     __out.set("state","block")
+                    __out.set("sender", self.name)
                 else:
                     __out.set("state","empty")
+                    __out.set("sender", self.name)
                 return {self.outport: __out}
             
             else:
                 __out.set("state","waiting for pop")
+                __out.set("sender", self.name)
                 return {self.outport: __out}
 
    
@@ -554,12 +561,14 @@ class Station(AtomicDEVS):
         if state == "busy":
             if self.is_first_pulse == True:
                 __out.set("state","block")
+                __out.set("sender", self.name)
                 __out.set("msg","first block")
                 return {self.outport: __out}
             
             else:
                 if self.next_is_blocked == True:
                     __out.set("state","block")
+                    __out.set("sender", self.name)
                     __out.set("msg","next is block")
                     return {self.outport: __out}
                 
@@ -568,6 +577,7 @@ class Station(AtomicDEVS):
                     ##print(self.name, " out")
                     __out = self.__product.get("incoming")
                     __out.set("state","pop")
+                    __out.set("sender", self.name)
                     
                     elapsed_time = self.current_time - self.__product.get("get_time")
                     __out.set(self.name,elapsed_time)
@@ -640,19 +650,30 @@ class Seperator(AtomicDEVS):
         self.name = name
         self.state = State_str("ready")
         self.out_way = out_way
-        self.num = 0
 
         __out = Out()
         __out.set("state","ready")
+        __out.set("sender", self.name)
         self.incoming = __out
 
         inport_name = name + '_inport'
         self.inport = self.addInPort(inport_name)
 
+        self.buffer = []
+        self.status = []
+        self.reponse_inport_list = []
+
         for num in range(out_way):
             outport_name = name + "_outport_" + str(num)
             val_name = "outport_" + str(num)
             setattr(self, val_name, self.addOutPort(outport_name))
+
+            response_inport_name = name + "_response_inport_" + str(num)
+            val_name = "response_inport_" + str(num)
+            setattr(self, val_name, self.addInPort(response_inport_name))
+            self.reponse_inport_list.append(val_name)
+
+            self.status.append(["ready",num])
             
     def timeAdvance(self):
         state = self.state.get()
@@ -668,12 +689,9 @@ class Seperator(AtomicDEVS):
         
     def intTransition(self):
         state = self.state.get()
-        
-        ##print(self.name,self.current_time,"int")
 
         if state == "pop":
             self.state = State_str("ready")
-
             return self.state
             
         else:
@@ -682,79 +700,60 @@ class Seperator(AtomicDEVS):
                 % (state, self.name))
     
     def extTransition(self, inputs):
-        port_in =inputs[self.inport]
+        port_in = inputs.get(self.inport, None)
 
-        self.incoming = port_in
-        if self.incoming.get("state") == "pop":
-            self.state = State_str("pop")
-        else:
-            self.state = State_str("ready")
+        port_num = None
+        i = 0
+        for inport in self.reponse_inport_list:
+            value = getattr(self, inport)
+            response = inputs.get(value, None)
+            if response != None:
+                port_num = i
+                break
+            i += 1
 
+        if port_in:
+            if port_in.get("state") == "pop":
+                self.buffer.append(port_in)
+
+                self.state = State_str("ready")
+                for flag in self.status:
+                    if flag[0] == "ready":
+                        self.state = State_str("pop")
+                        break
+                return self.state
+        
+        if response:
+            for res_port in self.status:
+                if res_port[1] == port_num:
+                    if response.get("state") == "block":
+                        print(self.status)
+                        print(f"{self.name} : port{port_num} = BLOCK")
+                        res_port[0] = "block"
+
+                    if response.get("state") == "pop":
+                        if res_port[0] == "block":
+                            print(f"{self.name} : port{port_num} = BLOCK RELEASE")
+                        res_port[0] = "ready"
+                    break
+
+        self.state = State_str("ready")
         return self.state
     
     def outputFnc(self):
+        for flag in self.status:
+            if flag[0] == "ready":
+                out_num = flag[1]
+                break
+        self.status = self.status[1:] + self.status[:1]
 
-        for out_num in range(self.out_way):
-            if self.num == out_num:
-                _outport_name = "outport_"+str(self.num)
-                outport_value = getattr(self, _outport_name)
-                self.incoming.set("seperator",_outport_name)
-                if self.num < self.out_way-1:
-                    self.num += 1
-                else:
-                    self.num = 0
-                return {outport_value: self.incoming}
+        _outport_name = "outport_"+str(out_num)
+        outport_value = getattr(self, _outport_name)
+        self.incoming.set("seperator",_outport_name)
 
-'''
-class Test(CoupledDEVS):
-    def __init__(self, name):
-        CoupledDEVS.__init__(self, name)
+        return {outport_value: self.buffer[0]}
 
-        self.source = self.addSubModel(Source(name="source",interval=2))
-        self.buffer = self.addSubModel(Buffer(name="buffer"))
 
-        self.station_first = self.addSubModel(Station(name="station_first"))
-
-        self.cell = self.addSubModel(Cell(name="cell"))
-        #self.line0 = self.addSubModel(Line_in_Cell(name="LinC0"))
-
-        self.station_last = self.addSubModel(Station(name="station_last"))
-        self.result = self.addSubModel(Drain(name="result"))
-
-        self.connectPorts(self.source.outport, self.buffer.inport)
-        self.connectPorts(self.buffer.outport, self.station_first.inport)
-        self.connectPorts(self.station_first.outport, self.cell.inport)
-        self.connectPorts(self.cell.outport, self.station_last.inport)
-        self.connectPorts(self.station_last.outport, self.result.inport)
-
-        self.connectPorts(self.station_last.outport, self.cell.response_inport)
-        self.connectPorts(self.station_first.outport, self.buffer.response_inport)
-
-    def select(self, imm):
-        if self.result in imm:
-            return self.result
-        elif self.station_last in imm:
-            return self.station_last
-        elif self.cell in imm:
-            return self.cell
-        elif self.station_first in imm:
-            return self.station_first
-        elif self.buffer in imm:
-            return self.buffer
-        elif self.source in imm:
-            return self.source
-
-#setting
-sim = Simulator(Test("Test"))
-
-sim.setVerbose()
-sim.setTerminationTime(100)
-
-sim.setClassicDEVS()
-
-sim.simulate()
-
-        '''
 
 
         

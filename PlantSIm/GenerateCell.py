@@ -6,6 +6,9 @@ from MUs import *
 from MaterialFlow import Source, Conveyor, Buffer, Drain, Station, Seperator
 
 
+
+
+
 class Tasks_Cell(CoupledDEVS):
     def __init__(self, name="Tasks_Cell", task_num = 3, param = 12):
         CoupledDEVS.__init__(self, name)
@@ -14,7 +17,7 @@ class Tasks_Cell(CoupledDEVS):
         self.inport = self.addInPort(name="Tasks_Cell_in")
         self.outport = self.addOutPort(name="Tasks_Cell_out")
         self.response_outport = self.addOutPort(name="Tasks_Cell_respose_out")
-
+            
         self.variable_name = []
         for i in range(task_num):
             station_name = name + "_" + str(i)
@@ -107,6 +110,7 @@ class Parallel_Cell(CoupledDEVS):
             conv_out = getattr(self, conveyor_out_name)
 
             self.connectPorts(self.seperator.outport_0, conv_in.inport)
+            self.connectPorts(conv_in.outport, self.seperator.response_inport_0)
             self.connectPorts(conv_in.outport, task.inport)
             self.connectPorts(task.response_outport, conv_in.response_inport)
             self.connectPorts(task.outport, conv_out.inport)
@@ -144,6 +148,11 @@ class Parallel_Cell(CoupledDEVS):
             outport_num = "outport_"+str(line)
             seperator_outport = getattr(self.seperator, outport_num)
             self.connectPorts(seperator_outport, conv_in.inport)
+
+            response_port_num = "response_inport_"+str(line)
+            seperator_response_inport = getattr(self.seperator, response_port_num)
+            self.connectPorts(conv_in.outport, seperator_response_inport)
+
             self.connectPorts(conv_in.outport, task.inport)
             self.connectPorts(task.response_outport, conv_in.response_inport)
             self.connectPorts(task.outport, conv_out.inport)
@@ -216,6 +225,11 @@ class Block_Cell(CoupledDEVS):
             outport_num = "outport_"+str(line)
             seperator_outport = getattr(self.seperator, outport_num)
             self.connectPorts(seperator_outport, conv_in.inport)
+
+            response_port_num = "response_inport_"+str(line)
+            seperator_response_inport = getattr(self.seperator, response_port_num)
+            self.connectPorts(conv_in.outport, seperator_response_inport)
+
             self.connectPorts(conv_in.outport, task.inport)
             self.connectPorts(task.response_outport, conv_in.response_inport)
             self.connectPorts(task.outport, conv_out.inport)
