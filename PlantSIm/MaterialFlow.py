@@ -474,7 +474,7 @@ class Station(AtomicDEVS):
             return INFINITY
         elif state == "busy":
             self.current_time += self.remain_time
-            return self.remain_time
+            return int(self.remain_time * 10) / 10
         else:
             raise DEVSException(\
                 "unknown state <%s> in <%s> time advance transition function"\
@@ -727,13 +727,15 @@ class Seperator(AtomicDEVS):
             for res_port in self.status:
                 if res_port[1] == port_num:
                     if response.get("state") == "block":
-                        print(self.status)
-                        print(f"{self.name} : port{port_num} = BLOCK")
+                        #print(self.status)
+                        #print(f"{self.name} : port{port_num} = BLOCK")
                         res_port[0] = "block"
 
                     if response.get("state") == "pop":
-                        if res_port[0] == "block":
-                            print(f"{self.name} : port{port_num} = BLOCK RELEASE")
+
+                        '''if res_port[0] == "block":
+                            print(f"{self.name} : port{port_num} = BLOCK RELEASE")'''
+                        
                         res_port[0] = "ready"
                     break
 
@@ -751,7 +753,7 @@ class Seperator(AtomicDEVS):
         outport_value = getattr(self, _outport_name)
         self.incoming.set("seperator",_outport_name)
 
-        return {outport_value: self.buffer[0]}
+        return {outport_value: self.buffer.pop(0)}
 
 
 

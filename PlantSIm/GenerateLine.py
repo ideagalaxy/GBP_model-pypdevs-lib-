@@ -62,11 +62,11 @@ class DEVS:
             if type == "Station":
                 el_type.append(type)
                 
-                tmp["working_time"] = [row["cycletime"],0,0,0]
+                tmp["working_time"] = [row["cycle time"],0,0,0]
                 el_param.append(tmp)
                 if station_first == True:
                     #Source 생성 주기를 첫번째 Station과 동기화
-                    el_param[0]["interval"] = row["cycletime"]
+                    el_param[0]["interval"] = row["cycle time"]
                     station_first = False
 
             elif type == "Conveyor":
@@ -82,11 +82,11 @@ class DEVS:
 
                     length = 1
 
-            elif type == "Block Cell" or type == "Parallel Cell":
+            elif type == "Block Cell" or type == "Parallel Cell" or type == "Two-sided wingbody Cell" or type == "One-sided wingbody Cell" :
                 el_type.append(type) 
                 tmp["line_num"]   = row["line_num"]
                 tmp["task_num"]   = row["task_num"]
-                tmp["cycle_time"] = row["cycletime"]
+                tmp["cycle_time"] = row["cycle time"]
                 el_param.append(tmp)
         
         #About Drain
@@ -142,6 +142,12 @@ class Gen_LINE(CoupledDEVS):
             
             elif type == "Parallel Cell":
                 setattr(self,name,self.addSubModel(Parallel_Cell(name=name, line_num=param["line_num"], task_num = param["task_num"], cycle_time=param["cycle_time"])))
+            
+            elif type == "Two-sided wingbody Cell":
+                setattr(self,name,self.addSubModel(Two_sided_Wingbody_Cell(name=name, line_num=param["line_num"], task_num = param["task_num"], cycle_time=param["cycle_time"])))
+            
+            elif type == "One-sided wingbody Cell":
+                setattr(self,name,self.addSubModel(One_sided_Wingbody_Cell(name=name, line_num=param["line_num"], task_num = param["task_num"], cycle_time=param["cycle_time"])))
 
             elif type == "Station":
                 setattr(self,name,self.addSubModel(Station(name=name,working_time=param["working_time"])))
@@ -166,8 +172,15 @@ class Gen_LINE(CoupledDEVS):
 
             if now_type == "Source" or now_type == "Drain":
                 continue
-            if next_type == "Parallel Cell" or next_type == "Block Cell":
+            if next_type == "Parallel Cell" or next_type == "Block Cell" or next_type == "Two-sided wingbody Cell":
                 continue
+            if next_type == "One-sided wingbody Cell":
+                val_response_outport = val_next.response_outport
+                val_response_inport = val_now.response_inport
+                self.connectPorts(val_response_outport, val_response_inport)
+                print(f"{self.variable_name[i+1]} response_outport -> {self.variable_name[i]} response_inport")
+                continue
+
             val_response_outport = val_next.outport
             val_response_inport = val_now.response_inport
             self.connectPorts(val_response_outport, val_response_inport)
