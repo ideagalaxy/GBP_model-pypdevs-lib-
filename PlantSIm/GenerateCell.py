@@ -5,77 +5,117 @@ from pypdevs.infinity import INFINITY
 from MUs import *
 from MaterialFlow import Source, Conveyor, Buffer, Drain, Station, Seperator
 
+class Two_sided_Wingbody_Module(CoupledDEVS):
+    '''
+    CSSC : Conveyor + Seperator + Station/Station(무조건 2개로 설정) + Conveyor
+    inport / outport / response_inport / response_outport
+    '''
+    def __init__(self, name="Two_sided_Wingbody_Module", cycle_time = 6):
+        CoupledDEVS.__init__(self, name)
+
+        
+        self.conveyor_in = self.addSubModel(Conveyor(name="conveyor_in",length=1))
+        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=2))
+        self.station1 =  self.addSubModel(Station(name="sub station1",working_time=[cycle_time,0,0,0]))
+        self.station2 =  self.addSubModel(Station(name="sub station2",working_time=[cycle_time,0,0,0]))
+        self.conveyor_out = self.addSubModel(Conveyor(name="conveyor_out",length=1))
+
+        self.inport = self.addInPort(name="Two_sided_Wingbody_Module_in")
+        self.outport = self.addOutPort(name="Two_sided_Wingbody_Module_out")
+        self.response_inport = self.addInPort(name="Two_sided_Wingbody_Module_response_inport")
+        self.response_outport = self.addOutPort(name="Two_sided_Wingbody_Module_response_outport")
+
+
+        self.connectPorts(self.inport,self.conveyor_in.inport)
+        self.connectPorts(self.conveyor_in.outport, self.seperator.inport)
+        self.connectPorts(self.conveyor_in.outport, self.response_outport)
+
+        self.connectPorts(self.seperator.outport_0, self.station1.inport)
+        self.connectPorts(self.station1.outport, self.seperator.response_inport_0)
+        self.connectPorts(self.station1.outport, self.conveyor_out.inport)
+
+        self.connectPorts(self.seperator.outport_1, self.station2.inport)
+        self.connectPorts(self.station2.outport, self.seperator.response_inport_1)
+        self.connectPorts(self.station2.outport, self.conveyor_out.inport)
+
+        self.connectPorts(self.conveyor_out.outport, self.station1.response_inport)
+        self.connectPorts(self.conveyor_out.outport, self.station2.response_inport)
+
+        self.connectPorts(self.conveyor_out.outport, self.outport)
+        self.connectPorts(self.response_inport, self.conveyor_out.response_inport)
+
+    def select(self, imm):
+        if self.conveyor_out in imm:
+            return self.conveyor_out
+        elif self.station2 in imm:
+            return self.station2
+        elif self.station1 in imm:
+            return self.station1
+        elif self.seperator in imm:
+            return self.seperator
+        elif self.conveyor_in in imm:
+            return self.conveyor_in
+        
+
+
 
 
 
 class Two_sided_Wingbody_Cell(CoupledDEVS):
-    def __init__(self, name="Parallel_Cell", line_num = 2, task_num = 3, cycle_time = 6):
+    
+    def __init__(self, name="Two_sided_Wingbody_Cell", line_num = 2, task_num = 3, cycle_time = 6):
+        '''
+        inport / outport / response_inport / response_outport
+        '''
         CoupledDEVS.__init__(self, name)
 
         if line_num < 2:
             raise ValueError("2개 이상부터 Cell 제작 가능")
 
-        self.seperator = self.addSubModel(Seperator(name="seperator",out_way=line_num))
-        self.buffer = self.addSubModel(Buffer(name="buffer"))
 
         self.inport = self.addInPort(name="Two_sided_Wingbody_Cell_in")
         self.outport = self.addOutPort(name="Two_sided_Wingbody_Cell_out")
         self.response_inport = self.addInPort(name="Two_sided_Wingbody_Cell_response_inport")
+        self.response_outport = self.addOutPort(name="Two_sided_Wingbody_Cell_response_outport")
 
-        self.connectPorts(self.inport, self.seperator.inport)
-        self.connectPorts(self.response_inport, self.buffer.response_inport)
-        self.connectPorts(self.buffer.outport, self.outport)
-    
-        tmp1 = ["seperator"]
-        tmp2 = []
-        tmp3 = []
+        tmp = []
         
-        conv_lengths = parrallel_generate_odd(line_num)
         i=0
-        for line in range(line_num):
-            if is_odd(line_num):
-                if line == 0:
-                    continue
-            print("line : ",line)
-            
-            conveyor_in_name = "line"+str(line)+"_conveyor_in"
-            setattr(self,conveyor_in_name,self.addSubModel(Conveyor(name=conveyor_in_name, length=conv_lengths[i])))
-            tmp1.append(conveyor_in_name)
-            #print(f"{self.name} : {conveyor_in_name} : setting {conv_lengths[i]} m")
-            
-            task_name = "line"+str(line)+"_task"
-            setattr(self,task_name,self.addSubModel(Station(name=task_name, working_time=cycle_time)))
-            tmp2.append(task_name)
-            #print(f"{self.name} : line{line}_station X {task_num} : setting {cycle_time} sec")
+        for task in range(task_num):
+            print("task : ",task)
 
-            conveyor_out_name = "line"+str(line)+"_conveyor_out"
-            setattr(self,conveyor_out_name,self.addSubModel(Conveyor(name=conveyor_out_name, length=conv_lengths[i])))
-            tmp3.append(conveyor_out_name)
-            #print(f"{self.name} : {conveyor_out_name}: setting {conv_lengths[i]} m")
+            task_name = "task_" + str(task)
+            setattr(self,task_name,self.addSubModel(Two_sided_Wingbody_Module(name=task_name, cycle_time=cycle_time)))
+            tmp.append(task_name)
+            task_var = getattr(self, task_name) 
 
-            print(f"{self.name} : conveyor_in : {conv_lengths[i]}m | task X {task_num} | conveyor_out : {conv_lengths[i]}m")
+            #첫번째 inport 연결 작업
+            if task == 0:
+                self.connectPorts(self.inport, task_var.inport)
+                self.connectPorts(task_var.response_outport, self.response_outport)
+            #앞 컨베이어와 연결 작업
+            else:
+                conveyor_name = "conveyor_"+str(task-1)
+                conv_var = getattr(self, conveyor_name) 
+                self.connectPorts(conv_var.outport, task_var.inport)
+                self.connectPorts(task_var.response_outport, conv_var.response_inport)
 
-            conv_in = getattr(self, conveyor_in_name)
-            task = getattr(self, task_name)   
-            conv_out = getattr(self, conveyor_out_name)
 
-            outport_num = "outport_"+str(line)
-            seperator_outport = getattr(self.seperator, outport_num)
-            self.connectPorts(seperator_outport, conv_in.inport)
+            #마지막 task 처리 작업
+            if task == (task_num-1):
+                self.connectPorts(self.response_inport, task_var.response_inport)
+                self.connectPorts(task_var.outport, self.outport)
+            #뒤에 컨베이어 연결작업
+            else:
+                conveyor_name = "conveyor_"+str(task)
+                setattr(self,conveyor_name,self.addSubModel(Conveyor(name=conveyor_name, length=2)))
+                tmp.append(conveyor_name)
+                conv_var = getattr(self, conveyor_name) 
 
-            response_port_num = "response_inport_"+str(line)
-            seperator_response_inport = getattr(self.seperator, response_port_num)
-            self.connectPorts(conv_in.outport, seperator_response_inport)
-
-            self.connectPorts(conv_in.outport, task.inport)
-            self.connectPorts(task.response_outport, conv_in.response_inport)
-            self.connectPorts(task.outport, conv_out.inport)
-            self.connectPorts(conv_out.outport, self.buffer.inport)
-
-            i += 1
-        tmp3.append("buffer")
-
-        self.variable = tmp1 + tmp2 + tmp3
+                self.connectPorts(task_var.outport, conv_var.inport)
+                self.connectPorts(conv_var.outport, task_var.response_inport)
+                
+        self.variable = tmp
 
     def select(self, imm):
         for var_name in reversed(self.variable):

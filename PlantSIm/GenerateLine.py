@@ -55,6 +55,7 @@ class DEVS:
                          "interval" : self.source_interval})
         
         length = 1
+        station_first = True
         for index, row in input.iterrows():
             type = row["Type"]
             tmp = {}
@@ -63,6 +64,10 @@ class DEVS:
                 
                 tmp["working_time"] = [row["cycletime"],0,0,0]
                 el_param.append(tmp)
+                if station_first == True:
+                    #Source 생성 주기를 첫번째 Station과 동기화
+                    el_param[0]["interval"] = row["cycletime"]
+                    station_first = False
 
             elif type == "Conveyor":
 
