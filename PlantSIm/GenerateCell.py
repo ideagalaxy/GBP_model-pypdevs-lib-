@@ -365,7 +365,7 @@ class Tasks_Cell(CoupledDEVS):
             self.connectPorts(cur_station.outport,nex_station.inport)
             self.connectPorts(nex_station.outport,cur_station.response_inport)
             last_station = nex_station
-        print(last_station)
+            
         self.connectPorts(last_station.outport, self.outport)
         
     def select(self, imm):

@@ -262,7 +262,7 @@ class Conveyor(AtomicDEVS):
             return INFINITY
         
         elif state == "ready":
-            return INFINITY
+            return self.remain_time
         
         elif state == "empty":
             if len(self.conveyor) == 0:
@@ -289,6 +289,11 @@ class Conveyor(AtomicDEVS):
         state = state_arr[0]
         next_time = state_arr[1]
 
+        if state == "ready": 
+            self.remain_time = INFINITY
+            return self.state
+
+
         if state == "empty": 
             #update current_time
             self.current_time += self.remain_time
@@ -302,6 +307,7 @@ class Conveyor(AtomicDEVS):
                 if self.is_full == True:
                     self.state = State_arr(["block",INFINITY,len(self.conveyor)])
                 else:
+                    self.remain_time = INFINITY
                     self.state = State_arr(["ready",INFINITY,len(self.conveyor)])
             
             return self.state
@@ -366,7 +372,11 @@ class Conveyor(AtomicDEVS):
                     #끝에 도착한게 있을 때
                     elif state == "ready":
                         state_arr[2] = len(self.conveyor)
-                        self.state = State_arr(state_arr)
+                        self.state = State_arr([state,next_time,len(self.conveyor)])
+                        if self.is_full == True:
+                            self.remain_time = 0.0
+                        else:
+                            self.remain_time = INFINITY
                         return self.state
 
         if response_in:
@@ -391,7 +401,6 @@ class Conveyor(AtomicDEVS):
     def outputFnc(self):
         state_arr = self.state.get()
         state = state_arr[0]
-        next_time =state_arr[1]
 
         __out = Out()
         if state == "pop":
@@ -417,6 +426,13 @@ class Conveyor(AtomicDEVS):
                 __out.set("state","waiting for pop")
                 __out.set("sender", self.name)
                 return {self.outport: __out}
+        
+        if state == "ready":
+            __out.set("state","block")
+            __out.set("sender", self.name)
+            return {self.outport: __out}
+        
+        
 
    
 class Station(AtomicDEVS):
